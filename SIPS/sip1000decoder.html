@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-toast-plugin/1.3.2/jquery.toast.min.css" integrity="sha512-wJgJNTBBkLit7ymC6vvzM1EcSWeM9mmOu+1USHaRBbHkm6W9EgM0HY27+UtUaprntaYQJF75rc8gjxllKs5OIQ==" crossorigin="anonymous" />
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
+<style>
+.jq-toast-wrap {
+	width:350px;
+}
+</style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark bg-dark mb-3">
+  <a class="navbar-brand ms-3" href="#">SIP1000 Decoder Sample</a>
+</nav>
+<div class="container">
+<form>
+
+  <div class="mb-3">
+    <label for="signedPayload" class="form-label">SIP-1000 JSON Input</label>
+    <textarea id="signedPayload" class="form-control" rows="20"></textarea>
+  </div>
+
+
+  <div class="mb-3 d-grid gap-2 d-md-flex justify-content-md-end">
+    <button type="button" class="btn btn-primary me-md-2 mb-2 mb-md-0" onclick="verify()">出力</button>
+  </div>
+
+  <div id="uploadImageArea"></div>
+</form>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-toast-plugin/1.3.2/jquery.toast.min.js" integrity="sha512-zlWWyZq71UMApAjih4WkaRpikgY9Bz1oXIW5G0fED4vk14JjGlQ1UmkGM392jEULP8jbNMiwLWdM8Z87Hu88Fw==" crossorigin="anonymous"></script>
+<script src="js/config.js"></script>
+<script src="js/symapp.js"></script>
+
+<script>
+let core;
+let sym;
+let chain;
+let nodeUrl;
+let announcedHash;
+
+$('#spinner_ready').removeClass('collapse');
+
+const CONFIG_SYMBOL_APPLICATION = {
+	nodes:NODES,		//ノードリスト config.js内に記載
+	selectNodeCount:3,		//同期確認のために接続するノード数
+	timeout:2500,			//ノード接続待機時間 ミリ秒
+	heightDiffThreshold: 1, // 同期判断ブロック高差
+	retryCount:30,			//最大再接続回数
+	mainnet:"MAIN_NET",
+	testnet:"TEST_NET"
+};
+startSymbolApplication(
+
+	CONFIG_SYMBOL_APPLICATION,
+	
+	//onReady
+	async function(node){
+		$.toast({heading: 'Select Node',text: node.url,showHideTransition: 'plain',icon: 'info',});
+		console.log("Select Node: " + node.url);
+
+		const bundle = await import("https://www.unpkg.com/symbol-sdk@3.2.1/dist/bundle.web.js");
+		core =bundle.core;
+		sym = bundle.symbol;
+		chain = new sym.SymbolFacade(node.network.identifier);
+
+		nodeUrl = node.url;
+	},
+
+	async function(event){},	// onStatusChange 状態変更通知
+	async function(event){},	// onPhysicalMessage QR受信時
+	async function(event){
+
+		if(event.topic.indexOf("confirmed") === 0){
+
+
+			fetchImage();
+		} 
+	},	//onSocketMessage ソケット受信時
+	async function(nodeSocket){},	//onSocketResumed ソケット接続回復時
+	async function(){} // onVisible 画面フォーカス回復時
+);
+
+async function verify(){
+
+
+	const payload = document.getElementById("signedPayload").value;
+	sip1000 = JSON.parse(payload);
+
+	const dataList = await getDataList(sip1000);
+	const body = decodeBody(dataList,sip1000);
+    const uploadImageArea = document.getElementById('uploadImageArea');
+    
+    const imgElement = document.createElement('img');
+    imgElement.src = body;
+    uploadImageArea.appendChild(imgElement);
+}
+
+async function fetchImage(){
+
+	const address = document.getElementById("ownerAddress").value;
+	const resAccountData = await nodeFetch(nodeUrl + `/accounts/${address}`);
+	const accountData = JSON.parse(resAccountData).account;
+	const publicKey = accountData.publicKey;
+
+	const resData = await nodeFetch(nodeUrl + `/transactions/confirmed?pageSize=100&embedded=true&signerPublicKey=${publicKey}`);
+	const data = JSON.parse(resData).data;
+	textDecoder = new TextDecoder();
+	const meta = JSON.parse(textDecoder.decode(core.utils.hexToUint8(data[0].transaction.message).slice(1)));
+
+	let messageArray = [];
+	if(meta.headerStructure.type === "count"){
+		const bodyArray = data.slice(meta.headerStructure.structure.base);
+		const paddingSize = new Blob([meta.messageType]).size;
+		for(item of bodyArray){
+			messageArray.push(...core.utils.hexToUint8(item.transaction.message).slice(paddingSize));
+			if(messageArray.length >= meta.dataSize){
+				messageArray = messageArray.slice(0,meta.dataSize);
+				break;
+			}
+		}
+	}
+
+	const blob = new Blob([Uint8Array.from(messageArray)]);
+	const img = new Image();
+	img.src = URL.createObjectURL(blob);
+
+	// 画像の読み込みが完了した後にcanvasに描画
+	img.onload = () => {
+		const canvas = document.createElement('canvas');
+		canvas.width = img.width;
+		canvas.height = img.height;
+		const ctx = canvas.getContext('2d');
+		ctx.drawImage(img, 0, 0);
+		// canvasをDOMに追加
+		document.getElementById("uploadImageArea").appendChild(canvas);
+	};
+}
+
+
+async function getDataList(sip1000){
+
+    let dataList;
+    switch (sip1000.type) {
+
+        case "compositeHash":
+        case "compHash":
+            dataList = await getDataListByCompositeHash(sip1000);
+        break;
+        case "transactionHash":
+        case "txHash":
+            dataList = await getDataListByTransactionHash(sip1000);
+        break;
+        case "publicKey":
+        case "pubKey":   
+            dataList = await getDataListByPublicKey(sip1000);
+        break;
+        case "sourceAddress":
+        case "address":
+            dataList = await getDataListBySourceAddress(sip1000);
+        break;
+        case "metalOnSymbol":
+        case "metal":
+            dataList = await getDataListByMetalId(sip1000);
+        break;
+        case "comsa":
+            dataList = await getDataListByMosaicId(sip1000);
+        break;
+        case "nftDrive":
+        case "drive":
+            dataList = await getDataListByMosaicId(sip1000);
+        break;
+        case "mosaic":
+            dataList = await getDataListByMosaicId(sip1000);
+        break;
+
+    }
+    return dataList;
+}
+
+function decodeBody(dataList,sip1000){
+    let body;
+    switch (sip1000.encodeType) {
+        case "base64":
+            const textDecoder = new TextDecoder();
+            let contentText = "";
+            let bodySize = 0;
+            for(item of dataList){
+              uint8Item = core.utils.hexToUint8(item);
+              bodySize += uint8Item.length;
+              contentText +=  textDecoder.decode(uint8Item);
+              if(bodySize >= sip1000.bodySize){
+                break;
+              }
+            }
+            console.log(bodySize);
+            body = contentText;
+        break;
+        case "blob":
+
+            let contentArray = new Uint8Array();
+            for(item of dataList){
+                contentArray = new Uint8Array([...contentArray,...core.utils.hexToUint8(item)])
+                if(contentArray.length >= sip1000.bodySize){
+                    break;
+                }
+            }
+            console.log(contentArray.length);
+            imgblob = new Blob([contentArray],{type:sip1000.mimeType});
+            fileUrl = URL.createObjectURL(imgblob);
+            body = fileUrl;
+        break;
+    }
+    return body;
+}
+
+async function getDataListByMosaicId(sip1000){
+
+    //NFT-Drive
+    if(sip1000.listType === "array"){
+
+        const mosaicRes = await fetch(`${nodeUrl}/mosaics/${sip1000.id}`);    
+        const mosaicJson = await mosaicRes.json();
+        const ownerAddress = new sym.Address(
+            core.utils.hexToUint8(mosaicJson.mosaic.ownerAddress)
+        )
+        const txRes = await fetch(
+            `${nodeUrl}/transactions/confirmed?order=asc&address=${ownerAddress}`
+        );
+        const txJson = await txRes.json();
+        return await getDataListByNftDrive(sip1000.fromHeight,txJson.data[0].transaction.signerPublicKey,sip1000);
+
+    }else if(sip1000.listType === "static"){
+
+        const res = await fetch(`${nodeUrl}/metadata?targetId=${sip1000.id}`);
+        const json = await res.json();
+        return await getDataListByComsa(json.data,sip1000);
+    }
+}
+
+async function getDataListByCompositeHash(sip1000){
+    
+    if(sip1000.listType === "linked"){
+
+        return await getDataListByMetal(sip1000.id,sip1000);
+
+    }else if(sip1000.listType === "static"){
+
+        const metaRes = await fetch(`${nodeUrl}/metadata/${sip1000.id}`);
+        const metaJson = await metaRes.json();
+        const queryString = getComsaQuery(metaJson.metadataEntry);
+        const res = await fetch(`${nodeUrl}/metadata?${queryString}`);
+        const json = await res.json();
+        return await getDataListByComsa(json.data,sip1000);
+    }
+}
+
+async function getDataListByTransactionHash(sip1000){
+
+    const txRes = await fetch(`${nodeUrl}/transactions/confirmed/${sip1000.id}`);
+    const txJson = await txRes.json();
+    return await getDataListByNftDrive(txJson.meta.height,txJson.transaction.signerPublicKey,sip1000);
+}
+
+async function getDataListByPublicKey(sip1000){
+
+    return await getDataListByNftDrive(sip1000.fromHeight,sip1000.id,sip1000);
+}
+
+async function getDataListBySourceAddress(sip1000){
+
+    const accountRes = await fetch(`${nodeUrl}/accounts/${sip1000.id}`);
+    const accountJson = await accountRes.json();
+    return await getDataListByNftDrive(sip1000.fromHeight,accountJson.account.publicKey,sip1000);
+}
+
+async function getDataListByMetalId(sip1000){
+
+    const compositeHash = core.utils.uint8ToHex(decodeBase58(sip1000.id).slice(2));
+    return await getDataListByMetal(compositeHash,sip1000);
+}
+
+function getComsaQuery(metadataEntry){
+
+    const targetId = metadataEntry.targetId;
+    const sourceAddress = new sym.Address(
+      core.utils.hexToUint8(metadataEntry.sourceAddress)
+    );
+    const targetAddress = new sym.Address(
+      core.utils.hexToUint8(metadataEntry.targetAddress)
+    );
+    return `targetId=${targetId}&sourceAddress=${sourceAddress}&targetAddress=${targetAddress}`
+}
+
+function getMetalQuery(metadataEntry){
+
+    const value = metadataEntry.value;
+    const targetId = metadataEntry.targetId;
+    const scopedMetadataKey = value.slice(8,24);
+    const sourceAddress = new sym.Address(
+      core.utils.hexToUint8(metadataEntry.sourceAddress)
+    );
+    const targetAddress = new sym.Address(
+      core.utils.hexToUint8(metadataEntry.targetAddress)
+    );
+    return `scopedMetadataKey=${scopedMetadataKey}&targetId=${targetId}`
+        + `&sourceAddress=${sourceAddress}&targetAddress=${targetAddress}`
+}
+
+function getMetalData(value,magicOffset,textFlagOffset,chunkOffset,sip1000){
+    let data;
+    const uint8Item = core.utils.hexToUint8(value);
+    const uint8Chunk = uint8Item.slice(chunkOffset);
+    const magicBit = (uint8Item[0] >> 7) & 1;
+    const textFlagBit = (uint8Item[0] >> 6) & 1;
+
+    let firstZeroIndex;
+    if(textFlagBit == 1){
+        firstZeroIndex = -1;
+        for (let i = 0; i < uint8Chunk.length; i++) {
+            if (uint8Chunk[i] === 0) {
+                firstZeroIndex = i;
+                break;
+            }
+        }
+        data = core.utils.uint8ToHex(uint8Chunk.slice(firstZeroIndex + 1));
+    }else{
+        data = core.utils.uint8ToHex(uint8Chunk);
+    }
+    return {data:data,magicBit:magicBit}
+}
+
+async function getDataListByNftDrive(height,signerPublicKey,sip1000){
+
+    let listSize = 0;
+    let pageIndex = 1;
+    let hashList = [];
+    let json;
+    const txList = [];
+    do {
+        const res = await fetch(
+            `${nodeUrl}/transactions/confirmed?type=16961&type=16705&pageSize=100&pageNumber=${pageIndex}`
+            + `&fromHeight=${height}&signerPublicKey=${signerPublicKey}`
+        );
+        json = await res.json();
+        hashList = json.data.map(x => x.meta.hash);
+
+        for(let hash of hashList){
+            
+            const res = await fetch(nodeUrl + `/transactions/confirmed/${hash}`);
+            const txJson = await res.json();
+            const chunk = txJson.transaction.transactions.map(x=>x.transaction.message);
+            listSize += txJson.transaction.transactions.length;
+            txList.push(chunk);
+        }
+        pageIndex++;
+    
+    } while(
+        json.data.length == json.pagination.pageSize 
+        && listSize < sip1000.listSize
+    );
+    console.log(listSize);
+    const paddingSize = core.utils.uint8ToHex([sip1000.messageType]).length;
+    const textDecoder = new TextDecoder();
+    txList.sort(function(a, b) {
+
+        const a2 = Number(textDecoder.decode(core.utils.hexToUint8(a[0].slice(paddingSize))));
+        const b2 = Number(textDecoder.decode(core.utils.hexToUint8(b[0].slice(paddingSize))));
+        return (a2 > b2) ? 1 : -1;
+    })
+
+    let isInit = true;
+    let dataList = [];
+    for(let item of txList){
+
+        let body;
+        if(isInit){
+            isInit = false;
+            body = item.slice(sip1000.structure.initHeader);
+        }else{
+            body = item.slice(sip1000.structure.baseHeader);
+        } 
+        body = body.map(x => x.slice(paddingSize));
+        dataList = dataList.concat(body);
+    }
+    return dataList;  
+}
+
+async function getDataListByMetal(compositeHash,sip1000){
+
+    let magicOffset;
+    let textFlagOffset;
+    let chunkOffset;
+
+    for(item of sip1000.structure.byteIndex){
+        if(item.type === "key"){
+            if(item.key==="chunk"){
+                chunkOffset = item.offset;
+            }
+        }else if(item.type === "bitIndex"){
+            for(bitItem of item.bitIndex){
+                if(bitItem.key === "magic"){
+                    magicOffset = bitItem.offset;
+                }else if(bitItem.key === "textFlag"){
+                    textFlagOffset = bitItem.offset;
+                }
+            }
+        }
+    }
+    
+    const metaRes = await fetch(`${nodeUrl}/metadata/${compositeHash}`);
+    const metaJson = await metaRes.json();
+    let queryString = getMetalQuery(metaJson.metadataEntry);
+
+    const dataList = [];
+    let metalRes = getMetalData(metaJson.metadataEntry.value,magicOffset,textFlagOffset,chunkOffset,sip1000);
+    dataList.push(metalRes.data);
+
+    if(metalRes.magicBit == 0){
+        do {
+
+            const res = await fetch(`${nodeUrl}/metadata?${queryString}`);
+            const json = await res.json();
+            queryString = getMetalQuery(json.data[0].metadataEntry);
+            metalRes = getMetalData(json.data[0].metadataEntry.value,magicOffset,textFlagOffset,chunkOffset,sip1000);
+            dataList.push(metalRes.data);
+        } while(
+            metalRes.magicBit == 0
+            && dataList.length < sip1000.listSize
+        );
+    }
+    console.log(dataList.length);
+    return dataList;
+}
+
+async function getDataListByComsa(metaList,sip1000){
+
+    const textDecoder = new TextDecoder();
+    let dataList = [];
+    for(let key of sip1000.structure.staticList){
+        if(dataList.length >= sip1000.listSize){break;}
+
+        const metadata = metaList.filter(x=>x.metadataEntry.scopedMetadataKey === key);
+        if(metadata.length > 0){
+            const hashList = JSON.parse(
+              textDecoder.decode(core.utils.hexToUint8(metadata[0].metadataEntry.value))
+            );
+            for(hash of hashList){
+              const resTx = await fetch(nodeUrl + `/transactions/confirmed/${hash}`);
+              const jsonTx = await resTx.json();
+              const chunk = jsonTx.transaction.transactions.map(x=>x.transaction.message);
+              dataList = dataList.concat(chunk.slice(sip1000.structure.transactions.baseHeader));
+            }
+        }
+    }
+    console.log(dataList.length);
+    return dataList;
+}
+
+function decodeBase58(input) {
+    var alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    var base = alphabet.length;
+    var bytes = [0];
+    for (var i = 0; i < input.length; i++) {
+        var value = alphabet.indexOf(input[i]);
+        if (value === -1) {
+            throw new Error('Invalid character');
+        }
+        for (var j = 0; j < bytes.length; j++) {
+            bytes[j] *= base;
+        }
+        bytes[0] += value;
+        var carry = 0;
+        for (var j = 0; j < bytes.length; ++j) {
+            bytes[j] += carry;
+            carry = bytes[j] >> 8;
+            bytes[j] &= 0xff;
+        }
+        while (carry) {
+            bytes.push(carry & 0xff);
+            carry >>= 8;
+        }
+    }
+
+    // Leading zeros
+    for (var k = 0; input[k] === '1' && k < input.length - 1; k++) {
+        bytes.push(0);
+    }
+
+    return bytes.reverse(); // Return byte array
+}
+</script>
+</body>
+</html>
