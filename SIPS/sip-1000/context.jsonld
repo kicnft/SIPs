@@ -28,7 +28,6 @@
     },
     "structure": {
       "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#structure",
-      "@type": "@json",
       "@context": {
         "transactionType": {
           "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#transactionType",
@@ -52,7 +51,6 @@
         },
         "byteIndex": {
           "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#byteIndex",
-          "@type": "@json",
           "@context": {
             "offset": {
               "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#offset",
@@ -60,7 +58,6 @@
             },
             "bitIndex": {
               "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#bitIndex",
-              "@type": "@json",
               "@context": {
                 "offset": {
                   "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#offset",
@@ -92,7 +89,6 @@
         },
         "transactions": {
           "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#transactions",
-          "@type": "@json",
           "@context": {
             "transactionType": {
               "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#transactionType",
