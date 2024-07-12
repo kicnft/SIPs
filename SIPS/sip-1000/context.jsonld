@@ -28,6 +28,10 @@
       "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#listSize",
       "@type": "http://www.w3.org/2001/XMLSchema#integer"
     },
+    "structure": {
+      "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#structure",
+      "@type": "@json"
+    },
     "transactionType": {
       "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#transactionType",
       "@type": "http://www.w3.org/2001/XMLSchema#integer"
