@@ -4,10 +4,7 @@
     "@protected": true,
     "id": "@id",
     "type": "@type",
-    "listType": {
-      "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#listType",
-      "@type": "@vocab"
-    },
+    "listType": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#listType",
     "fromHeight": {
       "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#fromHeight",
       "@type": "http://www.w3.org/2001/XMLSchema#integer"
@@ -20,10 +17,7 @@
       "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#mimeType",
       "@type": "http://www.w3.org/2001/XMLSchema#string"
     },
-    "encodeType": {
-      "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#encodeType",
-      "@type": "@vocab"
-    },
+    "encodeType": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#encodeType",
     "bodySize": {
       "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#bodySize",
       "@type": "http://www.w3.org/2001/XMLSchema#integer"
@@ -34,77 +28,63 @@
     },
     "structure": {
       "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#structure",
-      "transactionType": {
-        "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#transactionType",
-        "@type": "http://www.w3.org/2001/XMLSchema#integer"
-      },
-      "messageType": {
-        "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#messageType",
-        "@type": "http://www.w3.org/2001/XMLSchema#integer"
-      },
-      "baseHeader": {
-        "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#baseHeader",
-        "@type": "http://www.w3.org/2001/XMLSchema#integer"
-      },
-      "initHeader": {
-        "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#initHeader",
-        "@type": "http://www.w3.org/2001/XMLSchema#integer"
-      },
-      "type": {
-        "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#type",
-        "@type": "http://www.w3.org/2001/XMLSchema#string"
-      },
-      "byteIndex": {
-        "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#byteIndex",
-        "@type": "@json"
-      },
-      "offset": {
-        "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#offset",
-        "@type": "http://www.w3.org/2001/XMLSchema#integer"
-      },
-      "bitIndex": {
-        "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#bitIndex",
-        "@type": "@json"
-      },
-      "key": {
-        "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#key",
-        "@type": "http://www.w3.org/2001/XMLSchema#string"
-      },
-      "length": {
-        "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#length",
-        "@type": "http://www.w3.org/2001/XMLSchema#integer"
-      },
-      "staticList": {
-        "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#staticList",
-        "@type": "@json"
-      },
-      "requestType": {
-        "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#requestType",
-        "@type": "http://www.w3.org/2001/XMLSchema#string"
-      },
-      "responseListType": {
-        "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#responseListType",
-        "@type": "http://www.w3.org/2001/XMLSchema#string"
-      },
-      "transactions": {
-        "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#transactions",
-        "transactionType": {
-          "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#transactionType",
-          "@type": "http://www.w3.org/2001/XMLSchema#integer"
-        },
-        "map": {
-          "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#map",
-          "@type": "http://www.w3.org/2001/XMLSchema#string"
-        },
-        "baseHeader": {
-          "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#baseHeader",
-          "@type": "http://www.w3.org/2001/XMLSchema#integer"
-        },
-        "messageType": {
-          "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#messageType",
-          "@type": "http://www.w3.org/2001/XMLSchema#integer"
-        }
-      }
+      "@type": "@json"
+    },
+    "transactionType": {
+      "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#transactionType",
+      "@type": "http://www.w3.org/2001/XMLSchema#integer"
+    },
+    "messageType": {
+      "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#messageType",
+      "@type": "http://www.w3.org/2001/XMLSchema#integer"
+    },
+    "baseHeader": {
+      "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#baseHeader",
+      "@type": "http://www.w3.org/2001/XMLSchema#integer"
+    },
+    "initHeader": {
+      "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#initHeader",
+      "@type": "http://www.w3.org/2001/XMLSchema#integer"
+    },
+    "byteIndex": {
+      "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#byteIndex",
+      "@type": "@json"
+    },
+    "offset": {
+      "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#offset",
+      "@type": "http://www.w3.org/2001/XMLSchema#integer"
+    },
+    "bitIndex": {
+      "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#bitIndex",
+      "@type": "@json"
+    },
+    "key": {
+      "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#key",
+      "@type": "http://www.w3.org/2001/XMLSchema#string"
+    },
+    "length": {
+      "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#length",
+      "@type": "http://www.w3.org/2001/XMLSchema#integer"
+    },
+    "staticList": {
+      "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#staticList",
+      "@type": "@json"
+    },
+    "requestType": {
+      "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#requestType",
+      "@type": "http://www.w3.org/2001/XMLSchema#string"
+    },
+    "responseListType": {
+      "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#responseListType",
+      "@type": "http://www.w3.org/2001/XMLSchema#string"
+    },
+    "transactions": {
+      "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#transactions",
+      "@type": "@json"
+    },
+    "map": {
+      "@id": "https://github.com/kicnft/SIPs/blob/main/SIPS/sip-1000.md#map",
+      "@type": "http://www.w3.org/2001/XMLSchema#string"
     }
   }
 }
