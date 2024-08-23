@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-toast-plugin/1.3.2/jquery.toast.min.css" integrity="sha512-wJgJNTBBkLit7ymC6vvzM1EcSWeM9mmOu+1USHaRBbHkm6W9EgM0HY27+UtUaprntaYQJF75rc8gjxllKs5OIQ==" crossorigin="anonymous" />
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
+<style>
+.jq-toast-wrap {
+	width:350px;
+}
+
+/* スピナーのスタイル */
+.spinner {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	position: fixed;
+	z-index: 1000;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+	background-color: rgba(255, 255, 255, 0.8);
+}
+
+
+/* ボタンのスタイル */
+#action-button {
+	padding: 10px 20px;
+	font-size: 16px;
+	border: none;
+	border-radius: 5px;
+	background-color: #3498db;
+	color: white;
+	cursor: pointer;
+	transition: background-color 0.3s ease;
+}
+
+#action-button:hover {
+	background-color: #2980b9;
+}
+
+/* モーダルのスタイル */
+.modal {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	position: fixed;
+	z-index: 1000;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+	background-color: rgba(0, 0, 0, 0.5); /* 半透明の黒 */
+}
+
+/* モーダルコンテンツのスタイル */
+.modal-content {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	width: 60%;
+	max-width: 600px;
+	height: 40%;
+	max-height: 400px;
+	background-color: white;
+	padding: 20px;
+	border-radius: 10px;
+	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+	text-align: center;
+}
+
+/* ローディングアイコンのスタイル */
+.loader {
+	border: 16px solid #f3f3f3;
+	border-radius: 50%;
+	border-top: 16px solid #3498db;
+	width: 120px;
+	height: 120px;
+	animation: spin 2s linear infinite;
+	margin-bottom: 20px;
+}
+
+@keyframes spin {
+	0% { transform: rotate(0deg); }
+	100% { transform: rotate(360deg); }
+}
+
+/* ローディングテキストのスタイル */
+.loading-text {
+	font-size: 18px;
+	color: #333;
+}
+
+</style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark bg-dark mb-3">
+  <a class="navbar-brand ms-3" href="#">Data Viewer</a>
+</nav>
+	<div id="loading-modal" class="modal" style="display: none;">
+		<div class="modal-content">
+			<div class="loader"></div>
+			<p class="loading-text">ブロックチェーンからデータ復元中...</p>
+		</div>
+	</div>
+
+	<div id="loading-spinner" class="spinner">
+		<div class="loader"></div>
+	</div>
+<div  id="main-content" class="container"  style="display: none;">
+
+  <div class="mb-3 input-group">
+	<input type="text" class="form-control me-2" id="mosaicId" placeholder="モザイクID" /><br />
+	<button type="button" class="btn btn-primary" onclick="fetchImage()">
+		<span id="spinner_update_sss" class="collapse spinner-border spinner-border-sm" role="status"></span>
+		読込
+	</button>
+  </div>
+  <div id="uploadImageArea"></div>
+<div id="explorer"></div>
+
+
+
+
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-toast-plugin/1.3.2/jquery.toast.min.js" integrity="sha512-zlWWyZq71UMApAjih4WkaRpikgY9Bz1oXIW5G0fED4vk14JjGlQ1UmkGM392jEULP8jbNMiwLWdM8Z87Hu88Fw==" crossorigin="anonymous"></script>
+<script src="js/config.js"></script>
+<script src="js/symapp.js"></script>
+
+<script>
+let core;
+let sym;
+let chain;
+let nodeUrl;
+
+let loadingModal = document.getElementById('loading-modal');
+let loadingSpinner = document.getElementById('loading-spinner');
+let mainContent = document.getElementById('main-content');
+let aggregateHash;
+
+const CONFIG_SYMBOL_APPLICATION = {
+	nodes:NODES,		//ノードリスト config.js内に記載
+	selectNodeCount:3,		//同期確認のために接続するノード数
+	timeout:3500,			//ノード接続待機時間 ミリ秒
+	heightDiffThreshold: 1, // 同期判断ブロック高差
+	retryCount:30,			//最大再接続回数
+	mainnet:"MAIN_NET",
+	testnet:"TEST_NET"
+};
+
+startSymbolApplication(
+
+	CONFIG_SYMBOL_APPLICATION,
+	
+	//onReady
+	async function(node){
+
+
+		let bundle;
+		try {
+			bundle = await import("https://www.unpkg.com/symbol-sdk@3.2.2/dist/bundle.web.js");
+		}catch{
+
+			alert("申し訳ございません。お使いのブラウザには対応しておりません。")
+			loadingSpinner.style.display = 'none';
+			mainContent.style.display = 'block';
+            document.getElementById('mosaicId').disabled = true;
+            document.querySelector('button').disabled = true;
+
+			return false;
+		}
+
+		core =bundle.core;
+		sym = bundle.symbol;
+
+		chain = new sym.SymbolFacade(node.network.identifier);
+
+		nodeUrl = node.url;
+
+		$.toast({heading: 'Select Node',text: node.url,showHideTransition: 'plain',icon: 'info',});
+		console.log("Select Node: " + node.url);
+
+		// モーダルを非表示にしてメインコンテンツを表示する
+		loadingSpinner.style.display = 'none';
+		mainContent.style.display = 'block';
+	},
+
+	async function(event){},	// onStatusChange 状態変更通知
+	async function(event){},	// onPhysicalMessage QR受信時
+	async function(event){},	//onSocketMessage ソケット受信時
+	async function(nodeSocket){},	//onSocketResumed ソケット接続回復時
+	async function(){} // onVisible 画面フォーカス回復時
+);
+
+async function getDataList(sip1000){
+
+	let dataList;
+	switch (sip1000.type) {
+
+		case "embeddedPublicKey":
+		case "publicKey":
+			dataList = await getDataListByEmbeddedPublicKey(sip1000);
+		break;
+	}
+	return dataList;
+}
+
+async function getDataListByEmbeddedPublicKey(sip1000){
+
+	return await getDataListByMiyoka(sip1000.fromHeight,sip1000.id,sip1000);
+}
+
+async function getDataListByMiyoka(height,signerPublicKey,sip1000){
+
+	let listSize = 0;
+	let pageIndex = 1;
+	let hashList = [];
+	let json;
+	const txList = [];
+	do {
+		const res = await fetch(
+			`${nodeUrl}/transactions/confirmed?type=16724&pageSize=100&pageNumber=${pageIndex}`
+			+ `&fromHeight=${height}&signerPublicKey=${signerPublicKey}&embedded=true`
+		);
+		json = await res.json();
+		txList.push(json.data.map(x=>x.transaction.message));
+
+//		listSize += json.data.length;
+		if(txList.flat().length > sip1000.listSize){
+			if(pageIndex === 1){
+				txList[txList.length -1].splice(txList[txList.length - 1].length - (txList.flat().length - sip1000.listSize) + sip1000.structure.initHeader);
+			}else{
+				txList[txList.length -1].splice(txList[txList.length - 1].length - (txList.flat().length - sip1000.listSize) + sip1000.structure.baseHeader);
+
+			}
+			break;
+		}
+
+		pageIndex++;
+
+	
+	} while(
+		json.data.length == json.pagination.pageSize 
+//		&& listSize < sip1000.listSize
+	);
+
+	aggregateHash = json.data[0].meta.aggregateHash;
+	const paddingSize = core.utils.uint8ToHex([sip1000.messageType]).length;
+	const textDecoder = new TextDecoder();
+	txList.sort(function(a, b) {
+
+		const a2 = Number(textDecoder.decode(core.utils.hexToUint8(a[0].slice(paddingSize))));
+		const b2 = Number(textDecoder.decode(core.utils.hexToUint8(b[0].slice(paddingSize))));
+		return (a2 > b2) ? 1 : -1;
+	})
+
+	let isInit = true;
+	let dataList = [];
+	for(let item of txList){
+
+		let body;
+		if(isInit){
+			isInit = false;
+			body = item.slice(sip1000.structure.initHeader);
+		}else{
+			body = item.slice(sip1000.structure.baseHeader);
+		} 
+		body = body.map(x => x.slice(paddingSize));
+		dataList = dataList.concat(body);
+	}
+	return dataList;  
+}
+
+function decodeBody(dataList,sip1000){
+	let body;
+	switch (sip1000.encodeType) {
+		case "base64":
+		break;
+		case "blob":
+
+			let contentArray = new Uint8Array();
+			for(item of dataList){
+				contentArray = new Uint8Array([...contentArray,...core.utils.hexToUint8(item)])
+				if(contentArray.length >= sip1000.bodySize){
+					break;
+				}
+			}
+			imgblob = new Blob([contentArray],{type:sip1000.mimeType});
+			fileUrl = URL.createObjectURL(imgblob);
+			body = fileUrl;
+		break;
+	}
+	return body;
+}
+
+async function fetchImage(){
+
+	document.getElementById("uploadImageArea").innerHTML = '';
+    document.getElementById("explorer").innerHTML = '';
+
+	const mosaicId = document.getElementById("mosaicId").value;
+/*
+    const regex = /^[NT][A-Z0-9]{38}$/;
+
+    if (!regex.test(address)) {
+		alert("正しいフォーマットのデータアドレスを入力してください");
+        return false;
+    }
+*/
+	const resMetaData = await nodeFetch(nodeUrl + `/metadata?targetId=${mosaicId}&scopedMetadataKey=A60B457B83FAE60F`);
+	const metaData = JSON.parse(resMetaData).data[0];
+	if(!metaData){
+		alert("データが存在しませんでした。");
+		return false;
+	}
+
+	// モーダルを表示する
+	loadingModal.style.display = 'flex';
+
+	const textDecoder = new TextDecoder();
+	const sip1000 = JSON.parse(textDecoder.decode(core.utils.hexToUint8(metaData.metadataEntry.value)));
+
+	const dataList = await getDataList(sip1000);
+	const body = decodeBody(dataList,sip1000);
+
+	const img = new Image();
+	img.src = body;
+
+	// 画像の読み込みが完了した後にcanvasに描画
+	img.onload = () => {
+
+		// モーダルを非表示にしてメインコンテンツを表示する
+		loadingModal.style.display = 'none';
+		mainContent.style.display = 'block';
+
+		const canvas = document.createElement('canvas');
+		canvas.width = img.width;
+		canvas.height = img.height;
+		const ctx = canvas.getContext('2d');
+		ctx.drawImage(img, 0, 0);
+		// canvasをDOMに追加
+		document.getElementById("uploadImageArea").appendChild(canvas);
+
+
+
+        // リンク先のURLを設定
+        const addressPageURL = "https://symbol.fyi/mosaics/" + mosaicId;
+        const transactionDetailPageURL = "https://symbol.fyi/transactions/" + aggregateHash;
+
+        // 挿入先のdiv要素を取得
+        const explorerDiv = document.getElementById("explorer");
+
+		explorerDiv.innerHTML = '';
+
+        // 見出しを作成
+        const heading = document.createElement("h2");
+        heading.textContent = "ブロックチェーンエクスプローラー(外部リンク)";
+        explorerDiv.appendChild(heading);
+
+        // リストを作成
+        const list = document.createElement("ul");
+
+        // データアドレスリンクのリストアイテムを作成
+        const addressItem = document.createElement("li");
+        const addressLink = document.createElement("a");
+        addressLink.href = addressPageURL;
+        addressLink.target = "_blank";
+        addressLink.rel = "noopener noreferrer";
+        addressLink.textContent = "データアドレス";
+        addressItem.appendChild(addressLink);
+        list.appendChild(addressItem);
+
+        // トランザクションデータリンクのリストアイテムを作成
+        const transactionItem = document.createElement("li");
+        const transactionLink = document.createElement("a");
+        transactionLink.href = transactionDetailPageURL;
+        transactionLink.target = "_blank";
+        transactionLink.rel = "noopener noreferrer";
+        transactionLink.textContent = "トランザクションデータ";
+        transactionItem.appendChild(transactionLink);
+        list.appendChild(transactionItem);
+
+        // 作成したリストをdivに挿入
+        explorerDiv.appendChild(list);
+
+
+	};
+}
+
+</script>
+</body>
+</html>
