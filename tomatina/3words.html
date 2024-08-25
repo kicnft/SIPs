@@ -19,7 +19,8 @@
 
         h1 {
             color: #333;
-            margin-bottom: 20px;
+            margin: 20px 0;
+            text-align: center;
         }
 
         div {
@@ -28,12 +29,16 @@
             border-radius: 8px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             text-align: center;
+            width: 90%;
+            max-width: 400px; /* スマホに合わせて最大幅を設定 */
+            box-sizing: border-box; /* paddingを含む幅の計算 */
         }
 
         p {
             font-size: 18px;
             margin: 10px 0;
             color: #555;
+            word-wrap: break-word; /* 長いテキストの折り返し */
         }
 
         span {
@@ -50,13 +55,30 @@
             cursor: pointer;
             font-size: 16px;
             margin-top: 20px;
+            width: 90%;
+            max-width: 200px; /* ボタンの最大幅 */
+            box-sizing: border-box; /* paddingを含む幅の計算 */
         }
 
         button:hover {
             background-color: #0056b3;
         }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 24px; /* スマホでのヘッダーサイズを調整 */
+            }
+
+            p {
+                font-size: 16px; /* スマホでのテキストサイズを調整 */
+            }
+
+            button {
+                font-size: 14px; /* スマホでのボタンテキストサイズを調整 */
+                padding: 8px 16px; /* ボタンのパディングを調整 */
+            }
+        }
     </style>
-</head>    
 </head>
 <body>
     <h1>SIP-3939 3文字ニーモニックマイニング</h1>
