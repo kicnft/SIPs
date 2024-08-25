@@ -4,11 +4,87 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>4-Word Mnemonic and Address Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        h1 {
+            color: #333;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        div {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 90%;
+            max-width: 400px; /* スマホに合わせて最大幅を設定 */
+            box-sizing: border-box; /* paddingを含む幅の計算 */
+        }
+
+        p {
+            font-size: 18px;
+            margin: 10px 0;
+            color: #555;
+            word-wrap: break-word; /* 長いテキストの折り返し */
+        }
+
+        span {
+            font-weight: bold;
+            color: #000;
+        }
+
+        button {
+            background-color: #007BFF;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+            width: 90%;
+            max-width: 200px; /* ボタンの最大幅 */
+            box-sizing: border-box; /* paddingを含む幅の計算 */
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 24px; /* スマホでのヘッダーサイズを調整 */
+            }
+
+            p {
+                font-size: 16px; /* スマホでのテキストサイズを調整 */
+            }
+
+            button {
+                font-size: 14px; /* スマホでのボタンテキストサイズを調整 */
+                padding: 8px 16px; /* ボタンのパディングを調整 */
+            }
+        }
+    </style>
+
 </head>
 <body>
-    <h1>SIP-3939 4文字ニーモニックマイニング</h1>
+    <h1>4単語ニーモニックマイニング</h1>
     <div>
-        <p>4-word Mnemonic: <span id="custom-mnemonic"></span></p>
+        <p>Mnemonic: <span id="custom-mnemonic"></span></p>
         <p>Account Address: <span id="account-address"></span></p>
         <p>Private Key: <span id="private-key"></span></p>
     </div>
@@ -25,7 +101,8 @@
             const sym = bundle.symbol;
             const chain = new sym.SymbolFacade(networkId);
             const { sha256 } = await import('https://cdn.skypack.dev/@noble/hashes/sha256');
-            
+            let stopFlag = false; // 実行停止用のフラグ
+                        
             function getRandomBytes(length) {
                 const array = new Uint8Array(length);
                 window.crypto.getRandomValues(array);
@@ -102,17 +179,33 @@
             }
 
             document.getElementById('generate-button').addEventListener('click', async () => {
+                const button = document.getElementById('generate-button');
+    
+                if (button.textContent === 'Generate') {
+                    button.textContent = 'Stop'; // ボタンのテキストを「Stop」に変更
+                    stopFlag = false; // フラグをリセット
+                } else {
+                    stopFlag = true; // 停止フラグを設定
+                    button.textContent = 'Generate'; // ボタンのテキストを「Generate」に戻す
+                    return; // クリックイベントから抜ける
+                }
                 const targetAddress = 'NBTQCCJZCXETY75Y5WXYGBQ6LESAO3E2A5FRK4A'; // ここに特定のアドレス文字列を指定
 
                 for (let i = 0; i < 10000; i++) {
+                    if (stopFlag) break; // 停止フラグが立っていたらループを終了
+
                     const result = await generateFullMnemonic();
                     if (result.address === targetAddress) {
                         alert('当選アドレスが見つかりました: ' + result.address);
                         break; // ループを終了
                     }
-                    await sleep(0);
-    
+                    
+                    await sleep(0);                    
                 }
+
+                // ループ終了後にボタンのテキストを「Generate」にリセット
+                button.textContent = 'Generate';
+
             });
         })();
 
