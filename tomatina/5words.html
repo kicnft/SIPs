@@ -125,7 +125,12 @@
 
             function generate5WordMnemonic() {
                 const mnemonic = [];
-                for (let i = 0; i < 5; i++) {
+                mnemonic.push(customWordlist[393]);
+//                mnemonic.push(customWordlist[]);
+//                mnemonic.push(customWordlist[]);  
+//                mnemonic.push(customWordlist[]);  
+//                mnemonic.push(customWordlist[]);                
+                for (let i = 0; i < 4; i++) {
                     const randomIndex = Math.floor(Math.random() * customWordlist.length);
                     mnemonic.push(customWordlist[randomIndex]);
                 }
