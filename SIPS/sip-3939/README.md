@@ -1,3 +1,6 @@
+このワードリストはSymbolブロックチェーン上で直接保存されています。
+以下のツールを使用することでも復元可能です。
+
 ■ CHRONOTH
 - https://chronoth.nftdrive.net/CHRONOTH/67C3D657C7F98C391234A33F
   - https://symbol.fyi/accounts/NCNHCU7FCIPZ36BLJKZKM3AUNSSWCX4WKBICNIA
