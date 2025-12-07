@@ -275,6 +275,140 @@
         }
       }
       
+      /* QR検知オーバーレイ */
+      .detection-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 10;
+      }
+      
+      .detection-box {
+        position: absolute;
+        border: 3px solid #ef4444;
+        border-radius: 8px;
+        box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+        animation: detectPulse 0.5s ease-out;
+        pointer-events: none;
+      }
+      
+      @keyframes detectPulse {
+        0% {
+          transform: scale(1);
+          opacity: 0;
+          border-color: #ef4444;
+          box-shadow: 0 0 0 rgba(239, 68, 68, 0.5);
+        }
+        50% {
+          transform: scale(1.05);
+          opacity: 1;
+          border-color: #10b981;
+          box-shadow: 0 0 30px rgba(16, 185, 129, 0.8);
+        }
+        100% {
+          transform: scale(1);
+          opacity: 0.7;
+          border-color: #10b981;
+          box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+        }
+      }
+      
+      /* プログレスバー */
+      .progress-bar-container {
+        width: 100%;
+        height: 24px;
+        background: #0b1220;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        overflow: hidden;
+        margin: 10px 0;
+        position: relative;
+      }
+      
+      .progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
+        border-radius: 12px;
+        transition: width 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        min-width: 40px;
+      }
+      
+      .progress-bar::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(
+          90deg,
+          transparent 0%,
+          rgba(255, 255, 255, 0.2) 50%,
+          transparent 100%
+        );
+        animation: shimmer 2s infinite;
+      }
+      
+      @keyframes shimmer {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(100%);
+        }
+      }
+      
+      .progress-text {
+        font-size: 11px;
+        color: #ffffff;
+        font-weight: 600;
+        z-index: 1;
+        position: relative;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+      }
+      
+      .progress-info {
+        font-size: 11px;
+        color: #94a3b8;
+        text-align: center;
+        margin-top: 4px;
+      }
+      
+      /* 検知成功の通知 */
+      .detection-toast {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #10b981;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        animation: toastIn 0.3s ease-out;
+        z-index: 100;
+      }
+      
+      @keyframes toastIn {
+        0% {
+          transform: translateX(-50%) translateY(-20px);
+          opacity: 0;
+        }
+        100% {
+          transform: translateX(-50%) translateY(0);
+          opacity: 1;
+        }
+      }
+      
       /* ダークモード対応 */
       @media (prefers-color-scheme: light) {
         :root {
@@ -325,7 +459,14 @@
         </div>
         <div class="video-container">
           <video id="video" autoplay muted playsinline></video>
+          <div class="detection-overlay" id="detectionOverlay"></div>
         </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar" id="progressBar" style="width: 0%">
+            <span class="progress-text" id="progressText">0%</span>
+          </div>
+        </div>
+        <div class="progress-info" id="progressInfo">QRコードをカメラに向けてください</div>
         <textarea
           id="output"
           placeholder="読み取ったQRデータがここに表示されます"
@@ -357,6 +498,10 @@
       const recentEl = document.getElementById("recent");
       const canvas = document.getElementById("hidden-canvas");
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      const detectionOverlay = document.getElementById("detectionOverlay");
+      const progressBar = document.getElementById("progressBar");
+      const progressText = document.getElementById("progressText");
+      const progressInfo = document.getElementById("progressInfo");
 
       const startBtn = document.getElementById("start");
       const stopBtn = document.getElementById("stop");
@@ -369,6 +514,85 @@
       const seenRaw = new Set();
       let session = null;
       const recentItems = [];
+      let detectionBoxes = [];
+
+      // QR検知時の視覚エフェクト
+      function showDetectionEffect(bounds) {
+        // ビデオのサイズとキャンバスのサイズの比率を計算
+        const videoRect = videoEl.getBoundingClientRect();
+        const scaleX = videoRect.width / videoEl.videoWidth;
+        const scaleY = videoRect.height / videoEl.videoHeight;
+        
+        // 検知ボックスを作成
+        const box = document.createElement("div");
+        box.className = "detection-box";
+        
+        // 位置とサイズを設定
+        if (bounds) {
+          const x = bounds.x * scaleX;
+          const y = bounds.y * scaleY;
+          const width = bounds.width * scaleX;
+          const height = bounds.height * scaleY;
+          
+          box.style.left = `${x}px`;
+          box.style.top = `${y}px`;
+          box.style.width = `${width}px`;
+          box.style.height = `${height}px`;
+        } else {
+          // boundsがない場合は中央に表示
+          box.style.left = "30%";
+          box.style.top = "30%";
+          box.style.width = "40%";
+          box.style.height = "40%";
+        }
+        
+        detectionOverlay.appendChild(box);
+        
+        // トースト通知を表示
+        showToast("QRコード検知！");
+        
+        // アニメーション後に削除
+        setTimeout(() => {
+          box.remove();
+        }, 500);
+      }
+      
+      // トースト通知
+      function showToast(message) {
+        const toast = document.createElement("div");
+        toast.className = "detection-toast";
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+          toast.style.opacity = "0";
+          toast.style.transform = "translateX(-50%) translateY(-20px)";
+          setTimeout(() => toast.remove(), 300);
+        }, 1500);
+      }
+      
+      // プログレスバー更新
+      function updateProgressBar() {
+        if (!session) {
+          progressBar.style.width = "0%";
+          progressText.textContent = "0%";
+          progressInfo.textContent = "QRコードをカメラに向けてください";
+          return;
+        }
+        
+        const { total, received } = session;
+        const percentage = Math.round((received.size / total) * 100);
+        progressBar.style.width = `${percentage}%`;
+        progressText.textContent = `${percentage}%`;
+        
+        if (percentage === 100) {
+          progressInfo.textContent = "✅ 完成！全チャンク受信完了";
+          progressBar.style.background = "linear-gradient(90deg, #10b981 0%, #22c55e 100%)";
+        } else {
+          progressInfo.textContent = `読み取り中: ${received.size}/${total} チャンク`;
+          progressBar.style.background = "linear-gradient(90deg, #3b82f6 0%, #10b981 100%)";
+        }
+      }
 
       const fallbackDecoder = (imageData) =>
         window.jsQR && window.jsQR(imageData.data, imageData.width, imageData.height);
@@ -443,6 +667,7 @@
         recentItems.length = 0;
         renderRecent();
         renderProgress();
+        updateProgressBar();
         status("クリアしました");
       }
 
@@ -459,32 +684,49 @@
         if (detector) {
           try {
             const results = await detector.detect(videoEl);
-            handleResults(results.map((r) => r.rawValue));
+            const values = results.map((r) => r.rawValue);
+            const bounds = results.map((r) => r.boundingBox);
+            handleResults(values, bounds);
           } catch (err) {
             console.error("検出エラー:", err);
           }
         } else if (window.jsQR) {
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
           const res = fallbackDecoder(imageData);
-          if (res) handleResults([res.data]);
+          if (res) {
+            const bounds = res.location ? [{
+              x: Math.min(res.location.topLeftCorner.x, res.location.bottomLeftCorner.x),
+              y: Math.min(res.location.topLeftCorner.y, res.location.topRightCorner.y),
+              width: Math.abs(res.location.topRightCorner.x - res.location.topLeftCorner.x),
+              height: Math.abs(res.location.bottomLeftCorner.y - res.location.topLeftCorner.y)
+            }] : null;
+            handleResults([res.data], bounds);
+          }
         }
 
         requestAnimationFrame(tick);
       }
 
-      function handleResults(values) {
+      function handleResults(values, bounds) {
         if (!values.length) return;
         let newChunks = 0;
-        values.forEach((val) => {
+        values.forEach((val, idx) => {
           const trimmed = val.trim();
           if (!trimmed || seenRaw.has(trimmed)) return;
           seenRaw.add(trimmed);
           const parsed = parseChunk(trimmed);
           if (!parsed) return;
+          
+          // 新しいチャンクの場合、検知エフェクトを表示
+          if (!session || !session.received.has(parsed.index)) {
+            showDetectionEffect(bounds && bounds[idx]);
+          }
+          
           session = mergeChunk(session, parsed);
           newChunks += 1;
           addRecent(trimmed, parsed);
           maybeRender(session);
+          updateProgressBar();
         });
         if (newChunks) status(`新規 ${newChunks} チャンク追加`);
       }
@@ -523,6 +765,7 @@
         if (received.size !== total) {
           status(`受信 ${received.size}/${total}`);
           renderProgress();
+          updateProgressBar();
           return;
         }
         const b64url = [];
@@ -536,6 +779,8 @@
         outputEl.value = text;
         status(`完成: ${total} チャンク結合`);
         renderProgress();
+        updateProgressBar();
+        showToast("🎉 全チャンク受信完了！");
       }
 
       function decodeBase64Url(b64url) {
