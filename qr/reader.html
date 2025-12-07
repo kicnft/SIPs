@@ -11,6 +11,9 @@
         background: #0f172a;
         color: #e2e8f0;
       }
+      *, *::before, *::after {
+        box-sizing: border-box;
+      }
       body {
         margin: 0;
         min-height: 100vh;
@@ -22,7 +25,8 @@
           #0f172a;
       }
       .card {
-        width: min(960px, 100%);
+        width: 100%;
+        max-width: 960px;
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 18px;
@@ -152,12 +156,29 @@
         .card {
           padding: 14px;
         }
+        .controls {
+          gap: 8px;
+        }
         button {
-          flex: 1 1 45%;
+          flex: 1 1 48%;
           padding: 12px;
         }
         video {
           max-height: 320px;
+        }
+      }
+      @media (max-width: 480px) {
+        h1 {
+          font-size: 19px;
+        }
+        .controls {
+          flex-direction: column;
+        }
+        button {
+          flex: 1 1 100%;
+        }
+        video {
+          max-height: 260px;
         }
       }
     </style>
