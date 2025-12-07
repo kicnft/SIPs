@@ -2,12 +2,13 @@
 <html lang="ja">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>QR連続リーダー</title>
     <style>
       :root {
         color-scheme: light dark;
-        font-family: "SF Pro Text", "Noto Sans JP", system-ui, -apple-system, "Segoe UI",
-          sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+          "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
         background: #0f172a;
         color: #e2e8f0;
       }
@@ -16,205 +17,333 @@
       }
       body {
         margin: 0;
+        padding: 0;
         min-height: 100vh;
-        display: flex;
-        justify-content: center;
-        padding: 16px;
-        background: radial-gradient(circle at 20% 20%, #1f2937 0, transparent 25%),
-          radial-gradient(circle at 80% 0%, #0ea5e9 0, transparent 20%),
-          #0f172a;
+        min-height: -webkit-fill-available;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        overflow-x: hidden;
+      }
+      .container {
+        width: 100%;
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
+        padding: 12px;
       }
       .card {
         width: 100%;
-        max-width: 960px;
+        max-width: 100%;
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 18px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
-        padding: 16px;
-        backdrop-filter: blur(12px);
+        border-radius: 16px;
+        padding: 12px;
+        backdrop-filter: blur(10px);
       }
       h1 {
-        margin: 0 0 10px;
-        font-size: 22px;
+        margin: 0 0 8px;
+        font-size: 18px;
+        font-weight: 600;
         letter-spacing: 0.2px;
       }
       p {
-        margin: 0 0 10px;
+        margin: 0 0 8px;
         color: #cbd5e1;
+        font-size: 13px;
+        line-height: 1.5;
       }
       .controls {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
         margin-bottom: 10px;
       }
       button {
         border: 1px solid #334155;
         background: #1e293b;
         color: #e2e8f0;
-        border-radius: 12px;
-        padding: 12px 14px;
-        font-weight: 700;
+        border-radius: 10px;
+        padding: 10px 8px;
+        font-size: 14px;
+        font-weight: 600;
         cursor: pointer;
         transition: all 160ms ease;
-        flex: 1 1 120px;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
       }
-      button:hover {
-        border-color: #38bdf8;
-        color: #f8fafc;
+      button:active {
+        transform: scale(0.98);
+        background: #334155;
       }
       button:disabled {
         opacity: 0.5;
         cursor: not-allowed;
       }
-      video {
+      .video-container {
         width: 100%;
-        max-height: 420px;
+        aspect-ratio: 4 / 3;
+        max-height: 40vh;
+        position: relative;
         border-radius: 12px;
+        overflow: hidden;
         background: #0b1220;
         border: 1px solid rgba(255, 255, 255, 0.08);
-        margin-bottom: 12px;
-        object-fit: contain;
+        margin-bottom: 10px;
+      }
+      video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
       }
       textarea {
         width: 100%;
-        min-height: 160px;
+        min-height: 120px;
+        max-height: 200px;
         background: #0b1220;
         color: #e2e8f0;
         border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 12px;
-        padding: 12px;
-        font-family: ui-monospace, SFMono-Regular, "SFMono-Regular", Menlo, monospace;
+        border-radius: 10px;
+        padding: 10px;
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 13px;
         resize: vertical;
+        -webkit-appearance: none;
       }
       .status {
-        font-size: 13px;
+        font-size: 12px;
         color: #94a3b8;
-        min-height: 20px;
+        min-height: 18px;
+        padding: 4px 0;
       }
       .badges {
         display: flex;
-        gap: 8px;
+        gap: 6px;
         flex-wrap: wrap;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
       }
       .badge {
-        padding: 6px 10px;
+        padding: 4px 8px;
         border-radius: 999px;
         background: #1e293b;
         border: 1px solid rgba(255, 255, 255, 0.08);
-        font-size: 12px;
+        font-size: 11px;
         color: #cbd5e1;
+        white-space: nowrap;
       }
       .panel {
         background: rgba(255, 255, 255, 0.04);
         border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 12px;
-        padding: 10px;
-        margin-top: 10px;
+        border-radius: 10px;
+        padding: 8px;
+        margin-top: 8px;
       }
       .panel h3 {
-        margin: 0 0 8px;
-        font-size: 15px;
+        margin: 0 0 6px;
+        font-size: 13px;
+        font-weight: 600;
         color: #e2e8f0;
       }
       .progress-list {
-        font-size: 13px;
+        font-size: 12px;
         color: #cbd5e1;
         line-height: 1.4;
       }
       .progress-item {
         padding: 6px 8px;
-        border-radius: 10px;
+        border-radius: 8px;
         background: rgba(255, 255, 255, 0.04);
         border: 1px solid rgba(255, 255, 255, 0.06);
-        margin-bottom: 6px;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+      }
+      .progress-item div {
+        margin: 2px 0;
+        word-break: break-all;
       }
       .progress-item strong {
         color: #e2e8f0;
+        font-weight: 600;
       }
       .recent {
         list-style: none;
         padding: 0;
         margin: 0;
-        font-size: 12px;
+        font-size: 11px;
         color: #94a3b8;
       }
       .recent li {
-        padding: 6px 8px;
-        border-radius: 10px;
+        padding: 5px 6px;
+        border-radius: 8px;
         background: rgba(255, 255, 255, 0.03);
         border: 1px solid rgba(255, 255, 255, 0.05);
-        margin-bottom: 6px;
+        margin-bottom: 4px;
         word-break: break-all;
+        overflow-wrap: break-word;
+        line-height: 1.4;
       }
-      @media (max-width: 640px) {
-        body {
-          padding: 10px;
+      
+      /* タブレット向け調整 */
+      @media (min-width: 641px) {
+        .container {
+          padding: 16px;
         }
         .card {
-          padding: 14px;
+          max-width: 640px;
+          margin: 0 auto;
+          padding: 16px;
+          border-radius: 18px;
+        }
+        h1 {
+          font-size: 20px;
+        }
+        p {
+          font-size: 14px;
         }
         .controls {
-          gap: 8px;
+          grid-template-columns: repeat(4, 1fr);
         }
         button {
-          flex: 1 1 48%;
-          padding: 12px;
+          padding: 11px 12px;
+          font-size: 14px;
         }
-        video {
-          max-height: 320px;
+        .video-container {
+          max-height: 50vh;
+        }
+        textarea {
+          min-height: 140px;
+          font-size: 14px;
         }
       }
-      @media (max-width: 480px) {
+      
+      /* デスクトップ向け調整 */
+      @media (min-width: 1024px) {
+        .container {
+          padding: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .card {
+          max-width: 960px;
+          padding: 20px;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+        }
         h1 {
-          font-size: 19px;
+          font-size: 22px;
+          margin-bottom: 10px;
+        }
+        p {
+          margin-bottom: 10px;
         }
         .controls {
-          flex-direction: column;
+          margin-bottom: 12px;
         }
         button {
-          flex: 1 1 100%;
+          padding: 12px 14px;
+          border-radius: 12px;
         }
-        video {
-          max-height: 260px;
+        .video-container {
+          max-height: 420px;
+          margin-bottom: 12px;
+        }
+        textarea {
+          min-height: 160px;
+          padding: 12px;
+          border-radius: 12px;
+        }
+      }
+      
+      /* 横向き表示の最適化 */
+      @media (orientation: landscape) and (max-height: 500px) {
+        .container {
+          padding: 8px;
+        }
+        h1 {
+          font-size: 16px;
+          margin-bottom: 4px;
+        }
+        p {
+          display: none;
+        }
+        .video-container {
+          max-height: 35vh;
+        }
+        textarea {
+          min-height: 80px;
+          max-height: 120px;
+        }
+        .panel {
+          padding: 6px;
+        }
+      }
+      
+      /* ダークモード対応 */
+      @media (prefers-color-scheme: light) {
+        :root {
+          background: #f8fafc;
+          color: #1e293b;
+        }
+        body {
+          background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+        }
+        .card {
+          background: rgba(255, 255, 255, 0.9);
+          border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        button {
+          background: #f8fafc;
+          border: 1px solid #cbd5e1;
+          color: #1e293b;
+        }
+        button:active {
+          background: #e2e8f0;
+        }
+        textarea {
+          background: #ffffff;
+          color: #1e293b;
+          border: 1px solid #cbd5e1;
+        }
+        .video-container {
+          background: #f1f5f9;
+          border: 1px solid #cbd5e1;
         }
       }
     </style>
   </head>
   <body>
-    <div class="card">
-      <h1>QR連続リーダー</h1>
-      <p>
-        カメラに複数のQRコードをかざすと連続して読み取り、指定フォーマットの
-        チャンクを順不同で受け取り結合します。
-      </p>
-      <div class="badges">
-        <span id="mode" class="badge">モード: 未開始</span>
-        <span id="capability" class="badge">検出器: 確認中…</span>
+    <div class="container">
+      <div class="card">
+        <h1>QR連続リーダー</h1>
+        <p>カメラにQRコードをかざして連続読み取り</p>
+        <div class="badges">
+          <span id="mode" class="badge">モード: 未開始</span>
+          <span id="capability" class="badge">検出器: 確認中…</span>
+        </div>
+        <div class="controls">
+          <button id="start">開始</button>
+          <button id="stop" disabled>停止</button>
+          <button id="clear">リセット</button>
+          <button id="copy">コピー</button>
+        </div>
+        <div class="video-container">
+          <video id="video" autoplay muted playsinline></video>
+        </div>
+        <textarea
+          id="output"
+          placeholder="読み取ったQRデータがここに表示されます"
+          spellcheck="false"
+          readonly
+        ></textarea>
+        <div class="panel">
+          <h3>進捗</h3>
+          <div id="progress" class="progress-list">未受信</div>
+        </div>
+        <div class="panel">
+          <h3>直近のQR</h3>
+          <ul id="recent" class="recent">
+            <li>まだ受信していません</li>
+          </ul>
+        </div>
+        <div class="status" id="status">準備完了</div>
       </div>
-      <div class="controls">
-        <button id="start">開始</button>
-        <button id="stop" disabled>停止</button>
-        <button id="clear">リセット</button>
-        <button id="copy">コピー</button>
-      </div>
-      <video id="video" autoplay muted playsinline></video>
-      <textarea
-        id="output"
-        placeholder="読み取ったQRデータがここに追記されます"
-        spellcheck="false"
-      ></textarea>
-      <div class="panel">
-        <h3>進捗</h3>
-        <div id="progress" class="progress-list">未受信</div>
-      </div>
-      <div class="panel">
-        <h3>直近のQR</h3>
-        <ul id="recent" class="recent"></ul>
-      </div>
-      <div class="status" id="status"></div>
     </div>
 
     <canvas id="hidden-canvas" width="640" height="360" style="display: none"></canvas>
@@ -237,33 +366,25 @@
       let stream;
       let detector;
       let running = false;
-      const seenRaw = new Set(); // raw payloads to avoid dup scanning
-      let session = null; // holds chunks for the current message
+      const seenRaw = new Set();
+      let session = null;
       const recentItems = [];
-
-      // QRチャンクフォーマット (UTF-8 テキスト):
-      // QRCHUNK|v1|<messageId>|<index>/<total>|<base64url-payload>
-      // - messageId: 生成ごとにランダム(例: UUID、短い乱数でOK)
-      // - index: 0 起点のチャンク番号
-      // - total: チャンク総数 (1-9999想定)
-      // - base64url: -_, 末尾=省略可。ペイロードは任意のバイナリをBase64URL化。
-      // 例: QRCHUNK|v1|abc123|0/3|SGVsbG8
 
       const fallbackDecoder = (imageData) =>
         window.jsQR && window.jsQR(imageData.data, imageData.width, imageData.height);
 
       async function setupDetector() {
         if (!("BarcodeDetector" in window)) {
-          capabilityBadge.textContent = "検出器: jsQR(フォールバック)";
+          capabilityBadge.textContent = "検出器: jsQR";
           await loadJsQR();
           return;
         }
         const formats = await BarcodeDetector.getSupportedFormats();
         if (formats.includes("qr_code")) {
           detector = new BarcodeDetector({ formats: ["qr_code"] });
-          capabilityBadge.textContent = "検出器: BarcodeDetector (並列・複数同時)";
+          capabilityBadge.textContent = "検出器: ネイティブ";
         } else {
-          capabilityBadge.textContent = "検出器: jsQR(フォールバック)";
+          capabilityBadge.textContent = "検出器: jsQR";
           await loadJsQR();
         }
       }
@@ -272,7 +393,7 @@
         return new Promise((resolve, reject) => {
           if (window.jsQR) return resolve();
           const script = document.createElement("script");
-          script.src = "https://unpkg.com/jsqr@1.4.0/dist/jsQR.js";
+          script.src = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js";
           script.onload = () => resolve();
           script.onerror = reject;
           document.head.appendChild(script);
@@ -284,7 +405,11 @@
         try {
           await setupDetector();
           stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "environment" },
+            video: { 
+              facingMode: "environment",
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            },
             audio: false,
           });
           videoEl.srcObject = stream;
@@ -295,7 +420,7 @@
           status("カメラ開始");
           requestAnimationFrame(tick);
         } catch (err) {
-          status("カメラにアクセスできません: " + err.message);
+          status("カメラエラー: " + err.message);
         }
       }
 
@@ -308,6 +433,7 @@
           stream.getTracks().forEach((t) => t.stop());
           stream = null;
         }
+        videoEl.srcObject = null;
       }
 
       function clearOutput() {
@@ -322,7 +448,7 @@
 
       async function tick() {
         if (!running || videoEl.readyState < 2) {
-          requestAnimationFrame(tick);
+          if (running) requestAnimationFrame(tick);
           return;
         }
 
@@ -335,7 +461,7 @@
             const results = await detector.detect(videoEl);
             handleResults(results.map((r) => r.rawValue));
           } catch (err) {
-            status("検出エラー: " + err.message);
+            console.error("検出エラー:", err);
           }
         } else if (window.jsQR) {
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -360,11 +486,10 @@
           addRecent(trimmed, parsed);
           maybeRender(session);
         });
-        if (newChunks) status(`新規 ${newChunks} チャンクを追加`);
+        if (newChunks) status(`新規 ${newChunks} チャンク追加`);
       }
 
       function parseChunk(raw) {
-        // QRCHUNK|v1|<messageId>|<index>/<total>|<base64url>
         const parts = raw.split("|");
         if (parts.length !== 5) return null;
         const [prefix, version, messageId, chunkPart, b64] = parts;
@@ -378,7 +503,6 @@
       }
 
       function mergeChunk(current, chunk) {
-        // If no session or different messageId, start a new session
         if (!current || current.messageId !== chunk.messageId) {
           return {
             messageId: chunk.messageId,
@@ -386,7 +510,6 @@
             received: new Map([[chunk.index, chunk.b64]]),
           };
         }
-        // Ignore mismatched total for same messageId
         if (current.total !== chunk.total) return current;
         if (!current.received.has(chunk.index)) {
           current.received.set(chunk.index, chunk.b64);
@@ -402,17 +525,16 @@
           renderProgress();
           return;
         }
-        // Assemble in order
         const b64url = [];
         for (let i = 0; i < total; i += 1) {
           const v = received.get(i);
-          if (typeof v !== "string") return; // incomplete
+          if (typeof v !== "string") return;
           b64url.push(v);
         }
         const fullB64 = b64url.join("");
         const text = decodeBase64Url(fullB64);
         outputEl.value = text;
-        status(`完成: ${total} チャンクを結合`);
+        status(`完成: ${total} チャンク結合`);
         renderProgress();
       }
 
@@ -421,7 +543,13 @@
         const padded = b64url + "=".repeat(padLength);
         const b64 = padded.replace(/-/g, "+").replace(/_/g, "/");
         try {
-          return atob(b64);
+          const decoded = atob(b64);
+          const bytes = new Uint8Array(decoded.length);
+          for (let i = 0; i < decoded.length; i++) {
+            bytes[i] = decoded.charCodeAt(i);
+          }
+          const decoder = new TextDecoder('utf-8');
+          return decoder.decode(bytes);
         } catch (err) {
           status("デコード失敗: " + err.message);
           return "";
@@ -433,8 +561,9 @@
       }
 
       function addRecent(raw, chunk) {
+        const shortRaw = raw.length > 30 ? raw.substring(0, 30) + "..." : raw;
         recentItems.unshift(
-          `id=${chunk.messageId} idx=${chunk.index}/${chunk.total - 1} raw:${raw}`
+          `ID: ${chunk.messageId} [${chunk.index}/${chunk.total}]`
         );
         if (recentItems.length > 5) recentItems.pop();
         renderRecent();
@@ -468,12 +597,14 @@
         progressEl.innerHTML = "";
         const item = document.createElement("div");
         item.className = "progress-item";
+        
+        const shortId = messageId.length > 12 ? 
+          messageId.substring(0, 12) + "..." : messageId;
+        
         item.innerHTML = `
-          <div><strong>messageId:</strong> ${messageId}</div>
-          <div><strong>受信:</strong> ${received.size}/${total} (残り ${pending})</div>
-          <div><strong>未受信 index:</strong> ${
-            missingList.length ? missingList.join(", ") : "なし"
-          }</div>
+          <div><strong>ID:</strong> ${shortId}</div>
+          <div><strong>進捗:</strong> ${received.size}/${total} (残${pending})</div>
+          ${missingList.length ? `<div><strong>未受信:</strong> ${missingList.join(", ")}</div>` : ''}
         `;
         progressEl.appendChild(item);
       }
@@ -486,11 +617,16 @@
           await navigator.clipboard.writeText(outputEl.value);
           status("コピーしました");
         } catch (err) {
-          status("コピーできませんでした: " + err.message);
+          outputEl.select();
+          document.execCommand('copy');
+          status("コピーしました");
         }
       });
 
       window.addEventListener("beforeunload", stop);
+      
+      // 初期化
+      setupDetector().catch(console.error);
     </script>
   </body>
 </html>
