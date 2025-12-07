@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>QR分割ジェネレーター</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: #0f172a;
+        color: #e2e8f0;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+      .card {
+        width: min(1100px, 100%);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 18px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        padding: 20px;
+        backdrop-filter: blur(12px);
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 22px;
+        letter-spacing: 0.4px;
+      }
+      p {
+        margin: 0 0 12px;
+        color: #cbd5e1;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      textarea {
+        width: 100%;
+        min-height: 160px;
+        background: #0b1220;
+        color: #e2e8f0;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 12px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        resize: vertical;
+      }
+      label {
+        display: block;
+        font-size: 13px;
+        color: #cbd5e1;
+        margin-bottom: 4px;
+      }
+      input[type="text"],
+      input[type="number"] {
+        background: #0b1220;
+        color: #e2e8f0;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        padding: 10px 12px;
+        min-width: 160px;
+      }
+      button {
+        border: 1px solid #334155;
+        background: #1e293b;
+        color: #e2e8f0;
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 160ms ease;
+      }
+      button:hover {
+        border-color: #38bdf8;
+        color: #f8fafc;
+      }
+      .status {
+        font-size: 13px;
+        color: #94a3b8;
+        min-height: 20px;
+        margin-top: 8px;
+      }
+      .status.error {
+        color: #ef4444;
+      }
+      .status.success {
+        color: #10b981;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 12px;
+      }
+      .tile {
+        background: #0b1220;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 8px;
+      }
+      .qr-container {
+        background: white;
+        padding: 16px; /* クワイエットゾーン（4モジュール分の余白） */
+        border-radius: 4px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .qr-container img {
+        display: block;
+        width: 100%;
+        height: auto;
+        max-width: 200px;
+      }
+      .tile small {
+        display: block;
+        color: #94a3b8;
+        font-size: 12px;
+        margin-top: 6px;
+        word-break: break-all;
+      }
+      .download-section {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .download-btn {
+        background: #0ea5e9;
+        border-color: #0284c7;
+        margin-right: 8px;
+      }
+      .download-btn:hover {
+        background: #0284c7;
+      }
+      .loader {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid #e2e8f0;
+        border-radius: 50%;
+        border-top-color: transparent;
+        animation: spin 0.6s linear infinite;
+        margin-left: 8px;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+    <!-- CDNからQRコードライブラリを読み込み -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  </head>
+  <body>
+    <div class="card">
+      <h1>QR分割ジェネレーター</h1>
+      <p>テキストを指定フォーマットに分割し、QRコードを生成します。</p>
+      <textarea id="input" placeholder="ここにテキストを入力" spellcheck="false"></textarea>
+      <div class="row">
+        <div>
+          <label for="messageId">Message ID (空なら自動生成)</label>
+          <input id="messageId" type="text" placeholder="例: 8f5c23..." />
+        </div>
+        <div>
+          <label for="chunkSize">1チャンクの長さ (Base64URL文字数)</label>
+          <input id="chunkSize" type="number" value="800" min="100" max="2000" step="50" />
+        </div>
+      </div>
+      <div class="row">
+        <button id="generate">QR生成</button>
+        <button id="clear">リセット</button>
+      </div>
+      <div class="status" id="status">未生成</div>
+      <div class="grid" id="grid"></div>
+      <div class="download-section" id="downloadSection" style="display: none;">
+        <button class="download-btn" id="downloadAll">全てのQRコードをダウンロード</button>
+        <button class="download-btn" id="downloadZip">ZIPでダウンロード</button>
+      </div>
+    </div>
+
+    <script>
+      const inputEl = document.getElementById("input");
+      const messageIdEl = document.getElementById("messageId");
+      const chunkSizeEl = document.getElementById("chunkSize");
+      const statusEl = document.getElementById("status");
+      const gridEl = document.getElementById("grid");
+      const generateBtn = document.getElementById("generate");
+      const clearBtn = document.getElementById("clear");
+      const downloadSection = document.getElementById("downloadSection");
+      const downloadAllBtn = document.getElementById("downloadAll");
+      const downloadZipBtn = document.getElementById("downloadZip");
+
+      let generatedQRCodes = [];
+
+      generateBtn.addEventListener("click", generate);
+      clearBtn.addEventListener("click", clearAll);
+      downloadAllBtn.addEventListener("click", downloadAllImages);
+      downloadZipBtn.addEventListener("click", downloadAsZip);
+
+      function clearAll() {
+        inputEl.value = "";
+        messageIdEl.value = "";
+        gridEl.innerHTML = "";
+        generatedQRCodes = [];
+        status("未生成");
+        downloadSection.style.display = "none";
+      }
+
+      function status(msg, type = "") {
+        statusEl.textContent = msg;
+        statusEl.className = "status " + type;
+      }
+
+      function randomId() {
+        if (window.crypto && crypto.randomUUID) {
+          return crypto.randomUUID().split("-")[0];
+        }
+        return Math.random().toString(36).slice(2, 10);
+      }
+
+      function textToBase64Url(text) {
+        const bytes = new TextEncoder().encode(text);
+        let binary = "";
+        bytes.forEach((b) => (binary += String.fromCharCode(b)));
+        const b64 = btoa(binary);
+        return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+      }
+
+      function chunkString(str, size) {
+        const chunks = [];
+        for (let i = 0; i < str.length; i += size) {
+          chunks.push(str.slice(i, i + size));
+        }
+        return chunks;
+      }
+
+      async function generate() {
+        const text = inputEl.value || "";
+        if (!text) {
+          status("テキストが空です", "error");
+          return;
+        }
+
+        status("生成中...", "");
+        generateBtn.disabled = true;
+        
+        try {
+          const size = Number(chunkSizeEl.value) || 800;
+          const mid = messageIdEl.value.trim() || randomId();
+
+          const b64url = textToBase64Url(text);
+          const payloadChunks = chunkString(b64url, size);
+          const total = payloadChunks.length;
+          gridEl.innerHTML = "";
+          generatedQRCodes = [];
+
+          const lines = payloadChunks.map(
+            (chunk, idx) => `QRCHUNK|v1|${mid}|${idx}/${total}|${chunk}`
+          );
+
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const tile = document.createElement("div");
+            tile.className = "tile";
+            
+            // QRコード用のコンテナ（白背景と余白）
+            const qrWrapper = document.createElement("div");
+            qrWrapper.className = "qr-container";
+            
+            const container = document.createElement("div");
+            container.id = `qr-${i}`;
+            qrWrapper.appendChild(container);
+            tile.appendChild(qrWrapper);
+            
+            const label = document.createElement("small");
+            label.textContent = `チャンク ${i + 1}/${total} (${line.length}文字)`;
+            tile.appendChild(label);
+            
+            gridEl.appendChild(tile);
+            
+            // QRコードを生成（余白は自動的に含まれる）
+            const qrcode = new QRCode(container, {
+              text: line,
+              width: 200,
+              height: 200,
+              colorDark: "#000000",
+              colorLight: "#ffffff",
+              correctLevel: QRCode.CorrectLevel.M,
+              margin: 1  // 追加の余白設定
+            });
+            
+            generatedQRCodes.push({
+              text: line,
+              index: i,
+              total: total,
+              messageId: mid
+            });
+          }
+          
+          status(`生成完了: ${total} チャンク (messageId=${mid})`, "success");
+          downloadSection.style.display = "block";
+        } catch (err) {
+          status("エラー: " + err.message, "error");
+        } finally {
+          generateBtn.disabled = false;
+        }
+      }
+
+      async function downloadAllImages() {
+        if (generatedQRCodes.length === 0) return;
+        
+        const images = gridEl.querySelectorAll('.qr-container img');
+        images.forEach((img, idx) => {
+          // 白背景を含むキャンバスを作成
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const padding = 40; // 余白のピクセル数
+          
+          canvas.width = img.naturalWidth + (padding * 2);
+          canvas.height = img.naturalHeight + (padding * 2);
+          
+          // 白背景を描画
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
+          // QRコードを中央に配置
+          ctx.drawImage(img, padding, padding);
+          
+          canvas.toBlob(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `qr-chunk-${idx + 1}.png`;
+            a.click();
+            URL.revokeObjectURL(url);
+          });
+        });
+      }
+
+      async function downloadAsZip() {
+        status("ZIP機能は別途JSZipライブラリが必要です", "error");
+        // ZIP機能を実装する場合は、JSZipライブラリを追加してください
+      }
+
+      // ページ読み込み時のチェック
+      window.addEventListener('DOMContentLoaded', () => {
+        if (typeof QRCode === 'undefined') {
+          status("QRCodeライブラリの読み込みに失敗しました。ページを再読み込みしてください。", "error");
+          generateBtn.disabled = true;
+        } else {
+          status("準備完了", "success");
+        }
+      });
+    </script>
+  </body>
+</html>
