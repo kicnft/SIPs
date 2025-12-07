@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>QR連続リーダー</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: #0f172a;
+        color: #e2e8f0;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+      .card {
+        width: min(960px, 100%);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 18px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        padding: 20px;
+        backdrop-filter: blur(12px);
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 22px;
+        letter-spacing: 0.4px;
+      }
+      p {
+        margin: 0 0 12px;
+        color: #cbd5e1;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+      }
+      button {
+        border: 1px solid #334155;
+        background: #1e293b;
+        color: #e2e8f0;
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 160ms ease;
+      }
+      button:hover {
+        border-color: #38bdf8;
+        color: #f8fafc;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      video {
+        width: 100%;
+        max-height: 360px;
+        border-radius: 12px;
+        background: #0b1220;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        margin-bottom: 12px;
+        object-fit: contain;
+      }
+      textarea {
+        width: 100%;
+        min-height: 180px;
+        background: #0b1220;
+        color: #e2e8f0;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 12px;
+        font-family: ui-monospace, SFMono-Regular, "SFMono-Regular", Menlo, monospace;
+        resize: vertical;
+      }
+      .status {
+        font-size: 13px;
+        color: #94a3b8;
+        min-height: 20px;
+      }
+      .badges {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+      }
+      .badge {
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #1e293b;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        font-size: 12px;
+        color: #cbd5e1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>QR連続リーダー</h1>
+      <p>
+        カメラに複数のQRコードをかざすと連続して読み取り、指定フォーマットの
+        チャンクを順不同で受け取り結合します。
+      </p>
+      <div class="badges">
+        <span id="mode" class="badge">モード: 未開始</span>
+        <span id="capability" class="badge">検出器: 確認中…</span>
+      </div>
+      <div class="controls">
+        <button id="start">開始</button>
+        <button id="stop" disabled>停止</button>
+        <button id="clear">リセット</button>
+        <button id="copy">コピー</button>
+      </div>
+      <video id="video" autoplay muted playsinline></video>
+      <textarea
+        id="output"
+        placeholder="読み取ったQRデータがここに追記されます"
+        spellcheck="false"
+      ></textarea>
+      <div class="status" id="status"></div>
+    </div>
+
+    <canvas id="hidden-canvas" width="640" height="360" style="display: none"></canvas>
+    <script>
+      const videoEl = document.getElementById("video");
+      const outputEl = document.getElementById("output");
+      const statusEl = document.getElementById("status");
+      const modeBadge = document.getElementById("mode");
+      const capabilityBadge = document.getElementById("capability");
+      const canvas = document.getElementById("hidden-canvas");
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+      const startBtn = document.getElementById("start");
+      const stopBtn = document.getElementById("stop");
+      const clearBtn = document.getElementById("clear");
+      const copyBtn = document.getElementById("copy");
+
+      let stream;
+      let detector;
+      let running = false;
+      const seenRaw = new Set(); // raw payloads to avoid dup scanning
+      let session = null; // holds chunks for the current message
+
+      // QRチャンクフォーマット (UTF-8 テキスト):
+      // QRCHUNK|v1|<messageId>|<index>/<total>|<base64url-payload>
+      // - messageId: 生成ごとにランダム(例: UUID、短い乱数でOK)
+      // - index: 0 起点のチャンク番号
+      // - total: チャンク総数 (1-9999想定)
+      // - base64url: -_, 末尾=省略可。ペイロードは任意のバイナリをBase64URL化。
+      // 例: QRCHUNK|v1|abc123|0/3|SGVsbG8
+
+      const fallbackDecoder = (imageData) =>
+        window.jsQR && window.jsQR(imageData.data, imageData.width, imageData.height);
+
+      async function setupDetector() {
+        if (!("BarcodeDetector" in window)) {
+          capabilityBadge.textContent = "検出器: jsQR(フォールバック)";
+          await loadJsQR();
+          return;
+        }
+        const formats = await BarcodeDetector.getSupportedFormats();
+        if (formats.includes("qr_code")) {
+          detector = new BarcodeDetector({ formats: ["qr_code"] });
+          capabilityBadge.textContent = "検出器: BarcodeDetector (並列・複数同時)";
+        } else {
+          capabilityBadge.textContent = "検出器: jsQR(フォールバック)";
+          await loadJsQR();
+        }
+      }
+
+      function loadJsQR() {
+        return new Promise((resolve, reject) => {
+          if (window.jsQR) return resolve();
+          const script = document.createElement("script");
+          script.src = "https://unpkg.com/jsqr@1.4.0/dist/jsQR.js";
+          script.onload = () => resolve();
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+
+      async function start() {
+        if (running) return;
+        try {
+          await setupDetector();
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" },
+            audio: false,
+          });
+          videoEl.srcObject = stream;
+          running = true;
+          startBtn.disabled = true;
+          stopBtn.disabled = false;
+          modeBadge.textContent = "モード: スキャン中";
+          status("カメラ開始");
+          requestAnimationFrame(tick);
+        } catch (err) {
+          status("カメラにアクセスできません: " + err.message);
+        }
+      }
+
+      function stop() {
+        running = false;
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        modeBadge.textContent = "モード: 停止";
+        if (stream) {
+          stream.getTracks().forEach((t) => t.stop());
+          stream = null;
+        }
+      }
+
+      function clearOutput() {
+        outputEl.value = "";
+        seenRaw.clear();
+        session = null;
+        status("クリアしました");
+      }
+
+      async function tick() {
+        if (!running || videoEl.readyState < 2) {
+          requestAnimationFrame(tick);
+          return;
+        }
+
+        canvas.width = videoEl.videoWidth;
+        canvas.height = videoEl.videoHeight;
+        ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+
+        if (detector) {
+          try {
+            const results = await detector.detect(videoEl);
+            handleResults(results.map((r) => r.rawValue));
+          } catch (err) {
+            status("検出エラー: " + err.message);
+          }
+        } else if (window.jsQR) {
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const res = fallbackDecoder(imageData);
+          if (res) handleResults([res.data]);
+        }
+
+        requestAnimationFrame(tick);
+      }
+
+      function handleResults(values) {
+        if (!values.length) return;
+        let newChunks = 0;
+        values.forEach((val) => {
+          const trimmed = val.trim();
+          if (!trimmed || seenRaw.has(trimmed)) return;
+          seenRaw.add(trimmed);
+          const parsed = parseChunk(trimmed);
+          if (!parsed) return;
+          session = mergeChunk(session, parsed);
+          newChunks += 1;
+          maybeRender(session);
+        });
+        if (newChunks) status(`新規 ${newChunks} チャンクを追加`);
+      }
+
+      function parseChunk(raw) {
+        // QRCHUNK|v1|<messageId>|<index>/<total>|<base64url>
+        const parts = raw.split("|");
+        if (parts.length !== 5) return null;
+        const [prefix, version, messageId, chunkPart, b64] = parts;
+        if (prefix !== "QRCHUNK" || version !== "v1") return null;
+        const [idxStr, totalStr] = chunkPart.split("/");
+        const index = Number(idxStr);
+        const total = Number(totalStr);
+        if (!Number.isInteger(index) || !Number.isInteger(total)) return null;
+        if (index < 0 || total <= 0 || index >= total) return null;
+        return { messageId, index, total, b64 };
+      }
+
+      function mergeChunk(current, chunk) {
+        // If no session or different messageId, start a new session
+        if (!current || current.messageId !== chunk.messageId) {
+          return {
+            messageId: chunk.messageId,
+            total: chunk.total,
+            received: new Map([[chunk.index, chunk.b64]]),
+          };
+        }
+        // Ignore mismatched total for same messageId
+        if (current.total !== chunk.total) return current;
+        if (!current.received.has(chunk.index)) {
+          current.received.set(chunk.index, chunk.b64);
+        }
+        return current;
+      }
+
+      function maybeRender(sess) {
+        if (!sess) return;
+        const { total, received } = sess;
+        if (received.size !== total) {
+          status(`受信 ${received.size}/${total}`);
+          return;
+        }
+        // Assemble in order
+        const b64url = [];
+        for (let i = 0; i < total; i += 1) {
+          const v = received.get(i);
+          if (typeof v !== "string") return; // incomplete
+          b64url.push(v);
+        }
+        const fullB64 = b64url.join("");
+        const text = decodeBase64Url(fullB64);
+        outputEl.value = text;
+        status(`完成: ${total} チャンクを結合`);
+      }
+
+      function decodeBase64Url(b64url) {
+        const padLength = (4 - (b64url.length % 4)) % 4;
+        const padded = b64url + "=".repeat(padLength);
+        const b64 = padded.replace(/-/g, "+").replace(/_/g, "/");
+        try {
+          return atob(b64);
+        } catch (err) {
+          status("デコード失敗: " + err.message);
+          return "";
+        }
+      }
+
+      function status(msg) {
+        statusEl.textContent = msg;
+      }
+
+      startBtn.addEventListener("click", start);
+      stopBtn.addEventListener("click", stop);
+      clearBtn.addEventListener("click", clearOutput);
+      copyBtn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(outputEl.value);
+          status("コピーしました");
+        } catch (err) {
+          status("コピーできませんでした: " + err.message);
+        }
+      });
+
+      window.addEventListener("beforeunload", stop);
+    </script>
+  </body>
+</html>
