@@ -6,50 +6,55 @@
     <style>
       :root {
         color-scheme: light dark;
-        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        font-family: "SF Pro Text", "Noto Sans JP", system-ui, -apple-system, "Segoe UI",
+          sans-serif;
         background: #0f172a;
         color: #e2e8f0;
       }
       body {
         margin: 0;
         min-height: 100vh;
-        display: grid;
-        place-items: center;
-        padding: 24px;
+        display: flex;
+        justify-content: center;
+        padding: 16px;
+        background: radial-gradient(circle at 20% 20%, #1f2937 0, transparent 25%),
+          radial-gradient(circle at 80% 0%, #0ea5e9 0, transparent 20%),
+          #0f172a;
       }
       .card {
         width: min(960px, 100%);
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 18px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-        padding: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+        padding: 16px;
         backdrop-filter: blur(12px);
       }
       h1 {
-        margin: 0 0 12px;
+        margin: 0 0 10px;
         font-size: 22px;
-        letter-spacing: 0.4px;
+        letter-spacing: 0.2px;
       }
       p {
-        margin: 0 0 12px;
+        margin: 0 0 10px;
         color: #cbd5e1;
       }
       .controls {
         display: flex;
-        gap: 8px;
+        gap: 10px;
         flex-wrap: wrap;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
       }
       button {
         border: 1px solid #334155;
         background: #1e293b;
         color: #e2e8f0;
-        border-radius: 10px;
-        padding: 10px 14px;
-        font-weight: 600;
+        border-radius: 12px;
+        padding: 12px 14px;
+        font-weight: 700;
         cursor: pointer;
         transition: all 160ms ease;
+        flex: 1 1 120px;
       }
       button:hover {
         border-color: #38bdf8;
@@ -61,7 +66,7 @@
       }
       video {
         width: 100%;
-        max-height: 360px;
+        max-height: 420px;
         border-radius: 12px;
         background: #0b1220;
         border: 1px solid rgba(255, 255, 255, 0.08);
@@ -70,7 +75,7 @@
       }
       textarea {
         width: 100%;
-        min-height: 180px;
+        min-height: 160px;
         background: #0b1220;
         color: #e2e8f0;
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -98,6 +103,63 @@
         font-size: 12px;
         color: #cbd5e1;
       }
+      .panel {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 10px;
+        margin-top: 10px;
+      }
+      .panel h3 {
+        margin: 0 0 8px;
+        font-size: 15px;
+        color: #e2e8f0;
+      }
+      .progress-list {
+        font-size: 13px;
+        color: #cbd5e1;
+        line-height: 1.4;
+      }
+      .progress-item {
+        padding: 6px 8px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        margin-bottom: 6px;
+      }
+      .progress-item strong {
+        color: #e2e8f0;
+      }
+      .recent {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        font-size: 12px;
+        color: #94a3b8;
+      }
+      .recent li {
+        padding: 6px 8px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        margin-bottom: 6px;
+        word-break: break-all;
+      }
+      @media (max-width: 640px) {
+        body {
+          padding: 10px;
+        }
+        .card {
+          padding: 14px;
+        }
+        button {
+          flex: 1 1 45%;
+          padding: 12px;
+        }
+        video {
+          max-height: 320px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -123,6 +185,14 @@
         placeholder="読み取ったQRデータがここに追記されます"
         spellcheck="false"
       ></textarea>
+      <div class="panel">
+        <h3>進捗</h3>
+        <div id="progress" class="progress-list">未受信</div>
+      </div>
+      <div class="panel">
+        <h3>直近のQR</h3>
+        <ul id="recent" class="recent"></ul>
+      </div>
       <div class="status" id="status"></div>
     </div>
 
@@ -133,6 +203,8 @@
       const statusEl = document.getElementById("status");
       const modeBadge = document.getElementById("mode");
       const capabilityBadge = document.getElementById("capability");
+      const progressEl = document.getElementById("progress");
+      const recentEl = document.getElementById("recent");
       const canvas = document.getElementById("hidden-canvas");
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
 
@@ -146,6 +218,7 @@
       let running = false;
       const seenRaw = new Set(); // raw payloads to avoid dup scanning
       let session = null; // holds chunks for the current message
+      const recentItems = [];
 
       // QRチャンクフォーマット (UTF-8 テキスト):
       // QRCHUNK|v1|<messageId>|<index>/<total>|<base64url-payload>
@@ -220,6 +293,9 @@
         outputEl.value = "";
         seenRaw.clear();
         session = null;
+        recentItems.length = 0;
+        renderRecent();
+        renderProgress();
         status("クリアしました");
       }
 
@@ -260,6 +336,7 @@
           if (!parsed) return;
           session = mergeChunk(session, parsed);
           newChunks += 1;
+          addRecent(trimmed, parsed);
           maybeRender(session);
         });
         if (newChunks) status(`新規 ${newChunks} チャンクを追加`);
@@ -301,6 +378,7 @@
         const { total, received } = sess;
         if (received.size !== total) {
           status(`受信 ${received.size}/${total}`);
+          renderProgress();
           return;
         }
         // Assemble in order
@@ -314,6 +392,7 @@
         const text = decodeBase64Url(fullB64);
         outputEl.value = text;
         status(`完成: ${total} チャンクを結合`);
+        renderProgress();
       }
 
       function decodeBase64Url(b64url) {
@@ -330,6 +409,52 @@
 
       function status(msg) {
         statusEl.textContent = msg;
+      }
+
+      function addRecent(raw, chunk) {
+        recentItems.unshift(
+          `id=${chunk.messageId} idx=${chunk.index}/${chunk.total - 1} raw:${raw}`
+        );
+        if (recentItems.length > 5) recentItems.pop();
+        renderRecent();
+        renderProgress();
+      }
+
+      function renderRecent() {
+        recentEl.innerHTML = "";
+        if (!recentItems.length) {
+          recentEl.innerHTML = "<li>まだ受信していません</li>";
+          return;
+        }
+        recentItems.forEach((txt) => {
+          const li = document.createElement("li");
+          li.textContent = txt;
+          recentEl.appendChild(li);
+        });
+      }
+
+      function renderProgress() {
+        if (!session) {
+          progressEl.textContent = "未受信";
+          return;
+        }
+        const { messageId, total, received } = session;
+        const pending = total - received.size;
+        const missingList = [];
+        for (let i = 0; i < total; i += 1) {
+          if (!received.has(i)) missingList.push(i);
+        }
+        progressEl.innerHTML = "";
+        const item = document.createElement("div");
+        item.className = "progress-item";
+        item.innerHTML = `
+          <div><strong>messageId:</strong> ${messageId}</div>
+          <div><strong>受信:</strong> ${received.size}/${total} (残り ${pending})</div>
+          <div><strong>未受信 index:</strong> ${
+            missingList.length ? missingList.join(", ") : "なし"
+          }</div>
+        `;
+        progressEl.appendChild(item);
       }
 
       startBtn.addEventListener("click", start);
