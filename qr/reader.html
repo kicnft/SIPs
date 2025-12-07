@@ -79,8 +79,8 @@
       }
       .video-container {
         width: 100%;
-        aspect-ratio: 4 / 3;
-        max-height: 40vh;
+        aspect-ratio: 16 / 9;
+        max-height: 55vh;
         position: relative;
         border-radius: 12px;
         overflow: hidden;
@@ -290,24 +290,10 @@
         width: 18px;
         height: 18px;
         border-radius: 50%;
-        background: #22c55e;
-        box-shadow: 0 0 18px rgba(34, 197, 94, 0.9);
+        background: #16a34a;
+        border: 2px solid #bbf7d0;
+        box-shadow: 0 0 22px rgba(34, 197, 94, 0.9);
         transform: translate(-50%, -50%);
-        animation: dotPulse 0.45s ease-out;
-      }
-      @keyframes dotPulse {
-        0% {
-          transform: translate(-50%, -50%) scale(0.8);
-          opacity: 0;
-        }
-        50% {
-          transform: translate(-50%, -50%) scale(1.1);
-          opacity: 1;
-        }
-        100% {
-          transform: translate(-50%, -50%) scale(1);
-          opacity: 0.85;
-        }
       }
       
       /* プログレスバー */
@@ -508,11 +494,18 @@
       const seenRaw = new Set();
       let session = null;
       const recentItems = [];
+      let lastOverlayAt = 0;
 
       // 検知位置の中央にのみマーカーを表示（サイズ情報は出さない）
       function drawDetectionOverlay(detections) {
         detectionOverlay.innerHTML = "";
-        if (!detections || !detections.length || !videoEl.videoWidth) return;
+        if (!detections || !detections.length || !videoEl.videoWidth) {
+          // 検出が途切れても直近の点を少し残す
+          if (performance.now() - lastOverlayAt > 200) {
+            detectionOverlay.innerHTML = "";
+          }
+          return;
+        }
 
         const videoRect = videoEl.getBoundingClientRect();
         const scaleX = videoRect.width / videoEl.videoWidth;
@@ -542,6 +535,8 @@
           dot.style.top = `${center.y * scaleY}px`;
           detectionOverlay.appendChild(dot);
         });
+
+        lastOverlayAt = performance.now();
       }
 
       // 検知音を再生
