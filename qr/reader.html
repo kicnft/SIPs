@@ -290,29 +290,47 @@
         position: absolute;
         border: 3px solid #ef4444;
         border-radius: 8px;
-        box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
-        animation: detectPulse 0.5s ease-out;
+        box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+        animation: detectPulse 0.4s ease-out;
         pointer-events: none;
+        background: rgba(239, 68, 68, 0.1);
       }
       
       @keyframes detectPulse {
         0% {
-          transform: scale(1);
+          transform: scale(0.8);
           opacity: 0;
           border-color: #ef4444;
-          box-shadow: 0 0 0 rgba(239, 68, 68, 0.5);
+          box-shadow: 0 0 0 rgba(239, 68, 68, 0);
         }
         50% {
-          transform: scale(1.05);
+          transform: scale(1.1);
           opacity: 1;
-          border-color: #10b981;
-          box-shadow: 0 0 30px rgba(16, 185, 129, 0.8);
+          border-color: #ef4444;
+          box-shadow: 0 0 30px rgba(239, 68, 68, 0.8);
         }
         100% {
           transform: scale(1);
-          opacity: 0.7;
-          border-color: #10b981;
-          box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+          opacity: 0.8;
+          border-color: #ef4444;
+          box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+        }
+      }
+      
+      @keyframes lineGlow {
+        0% {
+          opacity: 0;
+          filter: blur(2px);
+        }
+        50% {
+          opacity: 1;
+          filter: blur(0);
+          box-shadow: 0 0 20px rgba(255, 59, 88, 1);
+        }
+        100% {
+          opacity: 0.8;
+          filter: blur(0);
+          box-shadow: 0 0 10px rgba(255, 59, 88, 0.6);
         }
       }
       
@@ -516,45 +534,107 @@
       const recentItems = [];
       let detectionBoxes = [];
 
-      // QR検知時の視覚エフェクト
-      function showDetectionEffect(bounds) {
-        // ビデオのサイズとキャンバスのサイズの比率を計算
+      // QR検知時の視覚エフェクト（jsQRスタイル）
+      function showDetectionEffect(location) {
+        if (!location) return;
+        
+        // ビデオとオーバーレイのサイズ比率を計算
+        const videoRect = videoEl.getBoundingClientRect();
+        const scaleX = videoRect.width / canvas.width;
+        const scaleY = videoRect.height / canvas.height;
+        
+        // 4つの角を結ぶラインを描画
+        drawDetectionLine(
+          location.topLeftCorner, 
+          location.topRightCorner, 
+          scaleX, scaleY
+        );
+        drawDetectionLine(
+          location.topRightCorner, 
+          location.bottomRightCorner, 
+          scaleX, scaleY
+        );
+        drawDetectionLine(
+          location.bottomRightCorner, 
+          location.bottomLeftCorner, 
+          scaleX, scaleY
+        );
+        drawDetectionLine(
+          location.bottomLeftCorner, 
+          location.topLeftCorner, 
+          scaleX, scaleY
+        );
+        
+        // トースト通知
+        showToast("QRコード検知！");
+      }
+      
+      // 検知枠のライン描画
+      function drawDetectionLine(start, end, scaleX, scaleY) {
+        const line = document.createElement("div");
+        line.style.position = "absolute";
+        line.style.backgroundColor = "#FF3B58";
+        line.style.boxShadow = "0 0 10px rgba(255, 59, 88, 0.8)";
+        line.style.zIndex = "10";
+        
+        const x1 = start.x * scaleX;
+        const y1 = start.y * scaleY;
+        const x2 = end.x * scaleX;
+        const y2 = end.y * scaleY;
+        
+        const length = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+        const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
+        
+        line.style.left = `${x1}px`;
+        line.style.top = `${y1}px`;
+        line.style.width = `${length}px`;
+        line.style.height = "3px";
+        line.style.transformOrigin = "0 50%";
+        line.style.transform = `rotate(${angle}deg)`;
+        
+        // アニメーション
+        line.style.animation = "lineGlow 0.5s ease-out";
+        
+        detectionOverlay.appendChild(line);
+        
+        // アニメーション後に削除
+        setTimeout(() => {
+          line.style.opacity = "0";
+          setTimeout(() => line.remove(), 200);
+        }, 300);
+      }
+      
+      // BarcodeDetector用の検知エフェクト
+      function showDetectionBox(boundingBox) {
+        if (!boundingBox) return;
+        
         const videoRect = videoEl.getBoundingClientRect();
         const scaleX = videoRect.width / videoEl.videoWidth;
         const scaleY = videoRect.height / videoEl.videoHeight;
         
-        // 検知ボックスを作成
         const box = document.createElement("div");
         box.className = "detection-box";
         
-        // 位置とサイズを設定
-        if (bounds) {
-          const x = bounds.x * scaleX;
-          const y = bounds.y * scaleY;
-          const width = bounds.width * scaleX;
-          const height = bounds.height * scaleY;
-          
-          box.style.left = `${x}px`;
-          box.style.top = `${y}px`;
-          box.style.width = `${width}px`;
-          box.style.height = `${height}px`;
-        } else {
-          // boundsがない場合は中央に表示
-          box.style.left = "30%";
-          box.style.top = "30%";
-          box.style.width = "40%";
-          box.style.height = "40%";
-        }
+        const x = boundingBox.x * scaleX;
+        const y = boundingBox.y * scaleY;
+        const width = boundingBox.width * scaleX;
+        const height = boundingBox.height * scaleY;
+        
+        box.style.left = `${x}px`;
+        box.style.top = `${y}px`;
+        box.style.width = `${width}px`;
+        box.style.height = `${height}px`;
         
         detectionOverlay.appendChild(box);
         
-        // トースト通知を表示
+        // トースト通知
         showToast("QRコード検知！");
         
         // アニメーション後に削除
         setTimeout(() => {
-          box.remove();
-        }, 500);
+          box.style.opacity = "0";
+          setTimeout(() => box.remove(), 200);
+        }, 400);
       }
       
       // トースト通知
@@ -684,30 +764,31 @@
         if (detector) {
           try {
             const results = await detector.detect(videoEl);
-            const values = results.map((r) => r.rawValue);
-            const bounds = results.map((r) => r.boundingBox);
-            handleResults(values, bounds);
+            if (results.length > 0) {
+              const values = results.map((r) => r.rawValue);
+              const bounds = results.map((r) => r.boundingBox);
+              handleResults(values, { type: 'native', bounds: bounds });
+            }
           } catch (err) {
             console.error("検出エラー:", err);
           }
         } else if (window.jsQR) {
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const res = fallbackDecoder(imageData);
-          if (res) {
-            const bounds = res.location ? [{
-              x: Math.min(res.location.topLeftCorner.x, res.location.bottomLeftCorner.x),
-              y: Math.min(res.location.topLeftCorner.y, res.location.topRightCorner.y),
-              width: Math.abs(res.location.topRightCorner.x - res.location.topLeftCorner.x),
-              height: Math.abs(res.location.bottomLeftCorner.y - res.location.topLeftCorner.y)
-            }] : null;
-            handleResults([res.data], bounds);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "dontInvert"
+          });
+          if (code && code.data) {
+            handleResults([code.data], { 
+              type: 'jsqr', 
+              location: code.location 
+            });
           }
         }
 
         requestAnimationFrame(tick);
       }
 
-      function handleResults(values, bounds) {
+      function handleResults(values, detectInfo) {
         if (!values.length) return;
         let newChunks = 0;
         values.forEach((val, idx) => {
@@ -719,7 +800,13 @@
           
           // 新しいチャンクの場合、検知エフェクトを表示
           if (!session || !session.received.has(parsed.index)) {
-            showDetectionEffect(bounds && bounds[idx]);
+            if (detectInfo && detectInfo.type === 'jsqr' && detectInfo.location) {
+              // jsQRの場合は4角の座標を使用
+              showDetectionEffect(detectInfo.location);
+            } else if (detectInfo && detectInfo.type === 'native' && detectInfo.bounds && detectInfo.bounds[idx]) {
+              // BarcodeDetectorの場合はboundingBoxを使用
+              showDetectionBox(detectInfo.bounds[idx]);
+            }
           }
           
           session = mergeChunk(session, parsed);
