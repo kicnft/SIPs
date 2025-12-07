@@ -501,8 +501,17 @@
         if (!detections || !detections.length || !videoEl.videoWidth) return;
 
         const videoRect = videoEl.getBoundingClientRect();
-        const scaleX = videoRect.width / videoEl.videoWidth;
-        const scaleY = videoRect.height / videoEl.videoHeight;
+        const elW = videoRect.width;
+        const elH = videoRect.height;
+        const vidW = videoEl.videoWidth;
+        const vidH = videoEl.videoHeight;
+
+        // object-fit: cover のオフセットとスケールを計算し、正しい座標にマッピング
+        const scale = Math.max(elW / vidW, elH / vidH);
+        const drawW = vidW * scale;
+        const drawH = vidH * scale;
+        const offsetX = (elW - drawW) / 2;
+        const offsetY = (elH - drawH) / 2;
 
         detections.forEach((det) => {
           let corners = det.corners;
@@ -524,8 +533,8 @@
 
           const dot = document.createElement("div");
           dot.className = "detection-dot";
-          dot.style.left = `${center.x * scaleX}px`;
-          dot.style.top = `${center.y * scaleY}px`;
+          dot.style.left = `${center.x * scale + offsetX}px`;
+          dot.style.top = `${center.y * scale + offsetY}px`;
           detectionOverlay.appendChild(dot);
         });
       }
