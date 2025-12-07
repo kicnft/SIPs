@@ -80,7 +80,7 @@
       .video-container {
         width: 100%;
         aspect-ratio: 4 / 3;
-        max-height: 50vh;
+        max-height: 40vh;
         position: relative;
         border-radius: 12px;
         overflow: hidden;
@@ -91,7 +91,7 @@
       video {
         width: 100%;
         height: 100%;
-        object-fit: cover;
+        object-fit: contain;
       }
       textarea {
         width: 100%;
@@ -205,7 +205,7 @@
           font-size: 14px;
         }
         .video-container {
-          max-height: 60vh;
+          max-height: 50vh;
         }
         textarea {
           min-height: 140px;
@@ -264,7 +264,7 @@
           display: none;
         }
         .video-container {
-          max-height: 40vh;
+          max-height: 35vh;
         }
         textarea {
           min-height: 80px;
@@ -285,82 +285,28 @@
         pointer-events: none;
         z-index: 10;
       }
-      
-      .detection-box {
+      .detection-dot {
         position: absolute;
-        border: 3px solid #ef4444;
-        border-radius: 8px;
-        box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
-        animation: detectPulse 0.4s ease-out;
-        pointer-events: none;
-        background: rgba(239, 68, 68, 0.1);
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #22c55e;
+        box-shadow: 0 0 18px rgba(34, 197, 94, 0.9);
+        transform: translate(-50%, -50%);
+        animation: dotPulse 0.45s ease-out;
       }
-      
-      @keyframes detectPulse {
+      @keyframes dotPulse {
         0% {
-          transform: scale(0.8);
-          opacity: 0;
-          border-color: #ef4444;
-          box-shadow: 0 0 0 rgba(239, 68, 68, 0);
-        }
-        50% {
-          transform: scale(1.1);
-          opacity: 1;
-          border-color: #ef4444;
-          box-shadow: 0 0 30px rgba(239, 68, 68, 0.8);
-        }
-        100% {
-          transform: scale(1);
-          opacity: 0.8;
-          border-color: #ef4444;
-          box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
-        }
-      }
-      
-      @keyframes lineGlow {
-        0% {
-          opacity: 0;
-          filter: blur(2px);
-        }
-        50% {
-          opacity: 1;
-          filter: blur(0);
-          box-shadow: 0 0 20px rgba(255, 59, 88, 1);
-        }
-        100% {
-          opacity: 0.8;
-          filter: blur(0);
-          box-shadow: 0 0 10px rgba(255, 59, 88, 0.6);
-        }
-      }
-      
-      @keyframes pathPulse {
-        0% {
-          opacity: 0;
-          stroke-width: 1;
-        }
-        50% {
-          opacity: 1;
-          stroke-width: 4;
-        }
-        100% {
-          opacity: 0.8;
-          stroke-width: 3;
-        }
-      }
-      
-      @keyframes boxPulse {
-        0% {
-          transform: scale(0.9);
+          transform: translate(-50%, -50%) scale(0.8);
           opacity: 0;
         }
         50% {
-          transform: scale(1.05);
+          transform: translate(-50%, -50%) scale(1.1);
           opacity: 1;
         }
         100% {
-          transform: scale(1);
-          opacity: 0.8;
+          transform: translate(-50%, -50%) scale(1);
+          opacity: 0.85;
         }
       }
       
@@ -563,7 +509,7 @@
       let session = null;
       const recentItems = [];
 
-      // 検知枠をコーナー座標に沿って描画（複数同時対応）
+      // 検知位置の中央にのみマーカーを表示（サイズ情報は出さない）
       function drawDetectionOverlay(detections) {
         detectionOverlay.innerHTML = "";
         if (!detections || !detections.length || !videoEl.videoWidth) return;
@@ -572,17 +518,9 @@
         const scaleX = videoRect.width / videoEl.videoWidth;
         const scaleY = videoRect.height / videoEl.videoHeight;
 
-        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        svg.setAttribute("width", "100%");
-        svg.setAttribute("height", "100%");
-        svg.style.position = "absolute";
-        svg.style.inset = "0";
-        svg.style.pointerEvents = "none";
-
         detections.forEach((det) => {
           let corners = det.corners;
           if (!corners || corners.length < 4) {
-            // cornerPointsがない場合はバウンディングボックスから生成
             const box = det.box;
             if (!box) return;
             corners = [
@@ -592,22 +530,18 @@
               { x: box.x, y: box.y + box.height },
             ];
           }
-          const pts = corners
-            .slice(0, 4)
-            .map((p) => `${p.x * scaleX},${p.y * scaleY}`)
-            .join(" L ");
 
-          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-          path.setAttribute("d", `M ${pts} Z`);
-          path.setAttribute("fill", "rgba(255, 59, 88, 0.12)");
-          path.setAttribute("stroke", "#ff3b58");
-          path.setAttribute("stroke-width", "3");
-          path.style.filter = "drop-shadow(0 0 10px rgba(255, 59, 88, 0.8))";
-          path.style.animation = "pathPulse 0.45s ease-out";
-          svg.appendChild(path);
+          const center = corners.slice(0, 4).reduce(
+            (acc, p) => ({ x: acc.x + p.x / 4, y: acc.y + p.y / 4 }),
+            { x: 0, y: 0 }
+          );
+
+          const dot = document.createElement("div");
+          dot.className = "detection-dot";
+          dot.style.left = `${center.x * scaleX}px`;
+          dot.style.top = `${center.y * scaleY}px`;
+          detectionOverlay.appendChild(dot);
         });
-
-        detectionOverlay.appendChild(svg);
       }
 
       // 検知音を再生
