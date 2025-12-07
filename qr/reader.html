@@ -91,7 +91,7 @@
       video {
         width: 100%;
         height: 100%;
-        object-fit: cover;
+        object-fit: contain;
       }
       textarea {
         width: 100%;
@@ -563,94 +563,53 @@
       let session = null;
       const recentItems = [];
 
-      // QR検知時の視覚エフェクト（jsQR用）
-      function showDetectionEffect(location) {
-        if (!location) return;
-        
-        // Canvasの描画サイズとビデオ表示サイズの比率を取得
+      // 検知枠をコーナー座標に沿って描画（複数同時対応）
+      function drawDetectionOverlay(detections) {
+        detectionOverlay.innerHTML = "";
+        if (!detections || !detections.length || !videoEl.videoWidth) return;
+
         const videoRect = videoEl.getBoundingClientRect();
         const scaleX = videoRect.width / videoEl.videoWidth;
         const scaleY = videoRect.height / videoEl.videoHeight;
-        
-        // SVGで枠を描画
+
         const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("width", "100%");
+        svg.setAttribute("height", "100%");
         svg.style.position = "absolute";
-        svg.style.top = "0";
-        svg.style.left = "0";
-        svg.style.width = "100%";
-        svg.style.height = "100%";
+        svg.style.inset = "0";
         svg.style.pointerEvents = "none";
-        svg.style.zIndex = "20";
-        
-        // パスを作成（4つの角を結ぶ）
-        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        const points = [
-          `${location.topLeftCorner.x * scaleX},${location.topLeftCorner.y * scaleY}`,
-          `${location.topRightCorner.x * scaleX},${location.topRightCorner.y * scaleY}`,
-          `${location.bottomRightCorner.x * scaleX},${location.bottomRightCorner.y * scaleY}`,
-          `${location.bottomLeftCorner.x * scaleX},${location.bottomLeftCorner.y * scaleY}`
-        ];
-        
-        path.setAttribute("d", `M ${points.join(" L ")} Z`);
-        path.setAttribute("stroke", "#FF3B58");
-        path.setAttribute("stroke-width", "3");
-        path.setAttribute("fill", "rgba(255, 59, 88, 0.1)");
-        path.style.filter = "drop-shadow(0 0 10px rgba(255, 59, 88, 0.8))";
-        
-        // アニメーション
-        path.style.animation = "pathPulse 0.5s ease-out";
-        
-        svg.appendChild(path);
+
+        detections.forEach((det) => {
+          let corners = det.corners;
+          if (!corners || corners.length < 4) {
+            // cornerPointsがない場合はバウンディングボックスから生成
+            const box = det.box;
+            if (!box) return;
+            corners = [
+              { x: box.x, y: box.y },
+              { x: box.x + box.width, y: box.y },
+              { x: box.x + box.width, y: box.y + box.height },
+              { x: box.x, y: box.y + box.height },
+            ];
+          }
+          const pts = corners
+            .slice(0, 4)
+            .map((p) => `${p.x * scaleX},${p.y * scaleY}`)
+            .join(" L ");
+
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("d", `M ${pts} Z`);
+          path.setAttribute("fill", "rgba(255, 59, 88, 0.12)");
+          path.setAttribute("stroke", "#ff3b58");
+          path.setAttribute("stroke-width", "3");
+          path.style.filter = "drop-shadow(0 0 10px rgba(255, 59, 88, 0.8))";
+          path.style.animation = "pathPulse 0.45s ease-out";
+          svg.appendChild(path);
+        });
+
         detectionOverlay.appendChild(svg);
-        
-        // 音を鳴らす（ピコーン）
-        playDetectionSound();
-        
-        // アニメーション後に削除
-        setTimeout(() => {
-          svg.style.opacity = "0";
-          setTimeout(() => svg.remove(), 200);
-        }, 400);
       }
-      
-      // BarcodeDetector用の検知エフェクト（矩形）
-      function showDetectionBox(boundingBox) {
-        if (!boundingBox) return;
-        
-        const videoRect = videoEl.getBoundingClientRect();
-        const scaleX = videoRect.width / videoEl.videoWidth;
-        const scaleY = videoRect.height / videoEl.videoHeight;
-        
-        const box = document.createElement("div");
-        box.style.position = "absolute";
-        box.style.border = "3px solid #FF3B58";
-        box.style.borderRadius = "8px";
-        box.style.background = "rgba(255, 59, 88, 0.1)";
-        box.style.boxShadow = "0 0 20px rgba(255, 59, 88, 0.6)";
-        
-        const x = boundingBox.x * scaleX;
-        const y = boundingBox.y * scaleY;
-        const width = boundingBox.width * scaleX;
-        const height = boundingBox.height * scaleY;
-        
-        box.style.left = `${x}px`;
-        box.style.top = `${y}px`;
-        box.style.width = `${width}px`;
-        box.style.height = `${height}px`;
-        box.style.animation = "boxPulse 0.5s ease-out";
-        
-        detectionOverlay.appendChild(box);
-        
-        // 音を鳴らす
-        playDetectionSound();
-        
-        // アニメーション後に削除
-        setTimeout(() => {
-          box.style.opacity = "0";
-          setTimeout(() => box.remove(), 200);
-        }, 400);
-      }
-      
+
       // 検知音を再生
       function playDetectionSound() {
         // Web Audio APIで簡単なピコーン音を生成
@@ -776,6 +735,7 @@
           stream = null;
         }
         videoEl.srcObject = null;
+        detectionOverlay.innerHTML = "";
       }
 
       function clearOutput() {
@@ -783,6 +743,7 @@
         seenRaw.clear();
         session = null;
         recentItems.length = 0;
+        detectionOverlay.innerHTML = "";
         renderRecent();
         renderProgress();
         updateProgressBar();
@@ -808,9 +769,15 @@
             try {
               const results = await detector.detect(canvas);
               if (results.length > 0) {
-                const values = results.map((r) => r.rawValue);
-                const bounds = results.map((r) => r.boundingBox);
-                handleResults(values, { type: 'native', bounds: bounds });
+                const detections = results.map((r) => ({
+                  raw: r.rawValue,
+                  corners: r.cornerPoints || null,
+                  box: r.boundingBox || null,
+                }));
+                drawDetectionOverlay(detections);
+                handleResults(detections);
+              } else {
+                drawDetectionOverlay([]);
               }
             } catch (err) {
               console.error("検出エラー:", err);
@@ -821,10 +788,25 @@
               inversionAttempts: "dontInvert"
             });
             if (code && code.data && code.location) {
-              handleResults([code.data], { 
-                type: 'jsqr', 
-                location: code.location 
-              });
+              const detections = [{
+                raw: code.data,
+                corners: [
+                  code.location.topLeftCorner,
+                  code.location.topRightCorner,
+                  code.location.bottomRightCorner,
+                  code.location.bottomLeftCorner,
+                ],
+                box: {
+                  x: code.location.topLeftCorner.x,
+                  y: code.location.topLeftCorner.y,
+                  width: code.location.topRightCorner.x - code.location.topLeftCorner.x,
+                  height: code.location.bottomLeftCorner.y - code.location.topLeftCorner.y,
+                },
+              }];
+              drawDetectionOverlay(detections);
+              handleResults(detections);
+            } else {
+              drawDetectionOverlay([]);
             }
           }
         }
@@ -832,13 +814,13 @@
         requestAnimationFrame(tick);
       }
 
-      function handleResults(values, detectInfo) {
-        if (!values.length) return;
+      function handleResults(detections) {
+        if (!detections.length) return;
         let newChunks = 0;
         let hasNewData = false;
         
-        values.forEach((val, idx) => {
-          const trimmed = val.trim();
+        detections.forEach((det) => {
+          const trimmed = (det.raw || "").trim();
           if (!trimmed) return;
           
           const parsed = parseChunk(trimmed);
@@ -851,13 +833,7 @@
           if (isNewChunk) {
             seenRaw.add(chunkKey);
             hasNewData = true;
-            
-            // 検知エフェクトを表示（新しいチャンクの場合のみ）
-            if (detectInfo && detectInfo.type === 'jsqr' && detectInfo.location) {
-              showDetectionEffect(detectInfo.location);
-            } else if (detectInfo && detectInfo.type === 'native' && detectInfo.bounds && detectInfo.bounds[idx]) {
-              showDetectionBox(detectInfo.bounds[idx]);
-            }
+            playDetectionSound();
             
             session = mergeChunk(session, parsed);
             newChunks += 1;
