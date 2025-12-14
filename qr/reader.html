@@ -656,9 +656,15 @@
           const isNewChunk = !seenRaw.has(chunkKey);
           const last = lastSeen.get(chunkKey);
           const stillLocked = last ? now - last <= LOCK_MS : false;
+          
+          // 修正: ロック期間中なら緑、そうでなければ既知のものはオレンジ
           const isNewDisplay = isNewChunk || stillLocked;
           overlay.push({ ...det, isNew: isNewDisplay });
-          lastSeen.set(chunkKey, now);
+          
+          // ロック期間を更新（新規または継続検知の場合）
+          if (stillLocked || isNewChunk) {
+            lastSeen.set(chunkKey, now);
+          }
           
           if (isNewChunk) {
             seenRaw.add(chunkKey);
