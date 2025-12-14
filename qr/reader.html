@@ -128,58 +128,6 @@
         color: #cbd5e1;
         white-space: nowrap;
       }
-      .panel {
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 10px;
-        padding: 8px;
-        margin-top: 8px;
-      }
-      .panel h3 {
-        margin: 0 0 6px;
-        font-size: 13px;
-        font-weight: 600;
-        color: #e2e8f0;
-      }
-      .progress-list {
-        font-size: 12px;
-        color: #cbd5e1;
-        line-height: 1.4;
-      }
-      .progress-item {
-        padding: 6px 8px;
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-      }
-      .progress-item div {
-        margin: 2px 0;
-        word-break: break-all;
-      }
-      .progress-item strong {
-        color: #e2e8f0;
-        font-weight: 600;
-      }
-      .recent {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        font-size: 11px;
-        color: #94a3b8;
-      }
-      .recent li {
-        padding: 5px 6px;
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        margin-bottom: 4px;
-        word-break: break-all;
-        overflow-wrap: break-word;
-        line-height: 1.4;
-      }
-      
       /* タブレット向け調整 */
       @media (min-width: 641px) {
         .container {
@@ -302,7 +250,6 @@
         border: 2px solid #fed7aa;
         box-shadow: 0 0 16px rgba(249, 115, 22, 0.8);
       }
-      
       /* プログレスバー */
       .progress-bar-container {
         width: 100%;
@@ -314,44 +261,17 @@
         margin: 10px 0;
         position: relative;
       }
-      
       .progress-bar {
         height: 100%;
         background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
         border-radius: 12px;
-        transition: width 0.3s ease;
+        transition: width 0.25s ease;
         display: flex;
         align-items: center;
         justify-content: center;
         position: relative;
         min-width: 40px;
       }
-      
-      .progress-bar::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: linear-gradient(
-          90deg,
-          transparent 0%,
-          rgba(255, 255, 255, 0.2) 50%,
-          transparent 100%
-        );
-        animation: shimmer 2s infinite;
-      }
-      
-      @keyframes shimmer {
-        0% {
-          transform: translateX(-100%);
-        }
-        100% {
-          transform: translateX(100%);
-        }
-      }
-      
       .progress-text {
         font-size: 11px;
         color: #ffffff;
@@ -360,7 +280,6 @@
         position: relative;
         text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
       }
-      
       .progress-info {
         font-size: 11px;
         color: #94a3b8;
@@ -436,7 +355,6 @@
         <p>カメラにQRコードをかざして連続読み取り</p>
         <div class="badges">
           <span id="mode" class="badge">モード: 未開始</span>
-          <span id="capability" class="badge">検出器: 確認中…</span>
         </div>
         <div class="controls">
           <button id="start">開始</button>
@@ -460,16 +378,6 @@
           spellcheck="false"
           readonly
         ></textarea>
-        <div class="panel">
-          <h3>進捗</h3>
-          <div id="progress" class="progress-list">未受信</div>
-        </div>
-        <div class="panel">
-          <h3>直近のQR</h3>
-          <ul id="recent" class="recent">
-            <li>まだ受信していません</li>
-          </ul>
-        </div>
         <div class="status" id="status">準備完了</div>
       </div>
     </div>
@@ -480,9 +388,6 @@
       const outputEl = document.getElementById("output");
       const statusEl = document.getElementById("status");
       const modeBadge = document.getElementById("mode");
-      const capabilityBadge = document.getElementById("capability");
-      const progressEl = document.getElementById("progress");
-      const recentEl = document.getElementById("recent");
       const canvas = document.getElementById("hidden-canvas");
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
       const detectionOverlay = document.getElementById("detectionOverlay");
@@ -500,7 +405,8 @@
       let running = false;
       const seenRaw = new Set();
       let session = null;
-      const recentItems = [];
+      const lastSeen = new Map(); // chunkKey -> timestamp
+      const LOCK_MS = 600; // ms to keep green while continuous
 
       // 検知位置の中央にマーカーを描画（新規/既知で色分け）
       function drawDetectionOverlay(detections) {
@@ -585,44 +491,18 @@
         }, 1500);
       }
       
-      // プログレスバー更新
-      function updateProgressBar() {
-        if (!session) {
-          progressBar.style.width = "0%";
-          progressText.textContent = "0%";
-          progressInfo.textContent = "QRコードをカメラに向けてください";
-          return;
-        }
-        
-        const { total, received } = session;
-        const percentage = Math.round((received.size / total) * 100);
-        progressBar.style.width = `${percentage}%`;
-        progressText.textContent = `${percentage}%`;
-        
-        if (percentage === 100) {
-          progressInfo.textContent = "✅ 完成！全チャンク受信完了";
-          progressBar.style.background = "linear-gradient(90deg, #10b981 0%, #22c55e 100%)";
-        } else {
-          progressInfo.textContent = `読み取り中: ${received.size}/${total} チャンク`;
-          progressBar.style.background = "linear-gradient(90deg, #3b82f6 0%, #10b981 100%)";
-        }
-      }
-
       const fallbackDecoder = (imageData) =>
         window.jsQR && window.jsQR(imageData.data, imageData.width, imageData.height);
 
       async function setupDetector() {
         if (!("BarcodeDetector" in window)) {
-          capabilityBadge.textContent = "検出器: jsQR";
           await loadJsQR();
           return;
         }
         const formats = await BarcodeDetector.getSupportedFormats();
         if (formats.includes("qr_code")) {
           detector = new BarcodeDetector({ formats: ["qr_code"] });
-          capabilityBadge.textContent = "検出器: ネイティブ";
         } else {
-          capabilityBadge.textContent = "検出器: jsQR";
           await loadJsQR();
         }
       }
@@ -673,18 +553,16 @@
         }
         videoEl.srcObject = null;
         detectionOverlay.innerHTML = "";
+        updateProgressBar();
       }
 
       function clearOutput() {
         outputEl.value = "";
         seenRaw.clear();
         session = null;
-        recentItems.length = 0;
         detectionOverlay.innerHTML = "";
-        renderRecent();
-        renderProgress();
-        updateProgressBar();
         status("クリアしました");
+        updateProgressBar();
       }
 
       async function tick() {
@@ -756,6 +634,8 @@
         let newChunks = 0;
         let hasNewData = false;
         const overlay = [];
+        const now = performance.now();
+        const frameKeys = new Set();
         
         detections.forEach((det) => {
           const trimmed = (det.raw || "").trim();
@@ -772,8 +652,13 @@
           
           // 新しいチャンクかチェック
           const chunkKey = `${parsed.messageId}-${parsed.index}`;
+          frameKeys.add(chunkKey);
           const isNewChunk = !seenRaw.has(chunkKey);
-          overlay.push({ ...det, isNew: isNewChunk });
+          const last = lastSeen.get(chunkKey);
+          const stillLocked = last ? now - last <= LOCK_MS : false;
+          const isNewDisplay = isNewChunk || stillLocked;
+          overlay.push({ ...det, isNew: isNewDisplay });
+          lastSeen.set(chunkKey, now);
           
           if (isNewChunk) {
             seenRaw.add(chunkKey);
@@ -782,16 +667,22 @@
             
             session = mergeChunk(session, parsed);
             newChunks += 1;
-            addRecent(trimmed, parsed);
           }
         });
         
         if (hasNewData) {
           maybeRender(session);
-          updateProgressBar();
           if (newChunks) status(`新規 ${newChunks} チャンク追加`);
         }
 
+        // 古いエントリを掃除
+        for (const [key, ts] of lastSeen.entries()) {
+          if (!frameKeys.has(key) && now - ts > LOCK_MS * 4) {
+            lastSeen.delete(key);
+          }
+        }
+
+        updateProgressBar();
         return overlay;
       }
 
@@ -828,7 +719,6 @@
         const { total, received } = sess;
         if (received.size !== total) {
           status(`受信 ${received.size}/${total}`);
-          renderProgress();
           updateProgressBar();
           return;
         }
@@ -842,9 +732,31 @@
         const text = decodeBase64Url(fullB64);
         outputEl.value = text;
         status(`完成: ${total} チャンク結合`);
-        renderProgress();
         updateProgressBar();
         showToast("🎉 全チャンク受信完了！");
+      }
+
+      // プログレスバー更新
+      function updateProgressBar() {
+        if (!session) {
+          progressBar.style.width = "0%";
+          progressText.textContent = "0%";
+          progressInfo.textContent = "QRコードをカメラに向けてください";
+          return;
+        }
+
+        const { total, received } = session;
+        const percentage = Math.round((received.size / total) * 100);
+        progressBar.style.width = `${percentage}%`;
+        progressText.textContent = `${percentage}%`;
+
+        if (percentage === 100) {
+          progressInfo.textContent = "✅ 完成！全チャンク受信完了";
+          progressBar.style.background = "linear-gradient(90deg, #10b981 0%, #22c55e 100%)";
+        } else {
+          progressInfo.textContent = `読み取り中: ${received.size}/${total} チャンク`;
+          progressBar.style.background = "linear-gradient(90deg, #3b82f6 0%, #10b981 100%)";
+        }
       }
 
       function decodeBase64Url(b64url) {
@@ -867,55 +779,6 @@
 
       function status(msg) {
         statusEl.textContent = msg;
-      }
-
-      function addRecent(raw, chunk) {
-        const shortRaw = raw.length > 30 ? raw.substring(0, 30) + "..." : raw;
-        recentItems.unshift(
-          `ID: ${chunk.messageId} [${chunk.index}/${chunk.total}]`
-        );
-        if (recentItems.length > 5) recentItems.pop();
-        renderRecent();
-        renderProgress();
-      }
-
-      function renderRecent() {
-        recentEl.innerHTML = "";
-        if (!recentItems.length) {
-          recentEl.innerHTML = "<li>まだ受信していません</li>";
-          return;
-        }
-        recentItems.forEach((txt) => {
-          const li = document.createElement("li");
-          li.textContent = txt;
-          recentEl.appendChild(li);
-        });
-      }
-
-      function renderProgress() {
-        if (!session) {
-          progressEl.textContent = "未受信";
-          return;
-        }
-        const { messageId, total, received } = session;
-        const pending = total - received.size;
-        const missingList = [];
-        for (let i = 0; i < total; i += 1) {
-          if (!received.has(i)) missingList.push(i);
-        }
-        progressEl.innerHTML = "";
-        const item = document.createElement("div");
-        item.className = "progress-item";
-        
-        const shortId = messageId.length > 12 ? 
-          messageId.substring(0, 12) + "..." : messageId;
-        
-        item.innerHTML = `
-          <div><strong>ID:</strong> ${shortId}</div>
-          <div><strong>進捗:</strong> ${received.size}/${total} (残${pending})</div>
-          ${missingList.length ? `<div><strong>未受信:</strong> ${missingList.join(", ")}</div>` : ''}
-        `;
-        progressEl.appendChild(item);
       }
 
       startBtn.addEventListener("click", start);
